@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Takween Tutors</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "tailwind-merge": "https://esm.sh/tailwind-merge@2.2.1",
+    "clsx": "https://esm.sh/clsx@2.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "tailwindcss": "https://esm.sh/tailwindcss@^4.1.18"
+  }
+}
+</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: { DEFAULT: "#0F172A", foreground: "#FFFFFF" },
+              secondary: { DEFAULT: "#D97706", foreground: "#FFFFFF" },
+              accent: { DEFAULT: "#0EA5E9", foreground: "#FFFFFF" },
+              muted: { DEFAULT: "#F1F5F9", foreground: "#64748B" },
+              background: "#FFFFFF",
+              foreground: "#0F172A",
+            },
+            fontFamily: {
+              sans: ["Poppins", "sans-serif"],
+              heading: ["Montserrat", "sans-serif"],
+            },
+            borderRadius: { xl: "0.75rem", "2xl": "1rem" },
+            boxShadow: { 
+              'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+              'glow': '0 0 20px -5px rgba(217, 119, 6, 0.3)'
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+       html { scroll-behavior: smooth; }
+       body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background-color: #f8fafc; color: #0f172a; font-family: 'Poppins', sans-serif; }
+       
+       /* Custom Scrollbar */
+       ::-webkit-scrollbar { width: 8px; height: 8px; }
+       ::-webkit-scrollbar-track { background: transparent; }
+       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+       .no-scrollbar::-webkit-scrollbar { display: none; }
+       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+       
+       /* Animations */
+       .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(20px); }
+       .delay-100 { animation-delay: 0.1s; }
+       .delay-200 { animation-delay: 0.2s; }
+       .delay-300 { animation-delay: 0.3s; }
+       
+       @keyframes fadeInUp {
+         to { opacity: 1; transform: translateY(0); }
+       }
+
+       /* Glassmorphism */
+       .glass {
+         background: rgba(255, 255, 255, 0.7);
+         backdrop-filter: blur(10px);
+         -webkit-backdrop-filter: blur(10px);
+         border: 1px solid rgba(255, 255, 255, 0.3);
+       }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

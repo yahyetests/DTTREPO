@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold;
+  }
+}
+
+.container-custom {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.btn-primary {
+  @apply bg-primary text-white hover:bg-primary/90 transition-colors px-6 py-3 rounded-full font-semibold shadow-lg inline-flex items-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-white hover:bg-secondary/90 transition-colors px-6 py-3 rounded-full font-semibold shadow-lg inline-flex items-center gap-2;
+}
