@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { createSessionSchema } from '../lib/validators.js';
+import { createSessionSchema, updateProfileSchema, sendMessageSchema } from '../lib/validators.js';
+import { createZoomMeeting } from '../lib/zoom.js';
 
 const router = Router();
 
@@ -11,6 +12,10 @@ router.use(authenticate, requireRole('STUDENT'));
 // GET /api/student/dashboard
 router.get('/dashboard', async (req, res) => {
     try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const skip = (page - 1) * limit;
+
         const studentProfile = await prisma.studentProfile.findUnique({
             where: { userId: req.user!.userId },
         });
@@ -20,7 +25,7 @@ router.get('/dashboard', async (req, res) => {
             return;
         }
 
-        // Upcoming sessions with tutor and subject info
+        // 1. Upcoming Sessions (paginated)
         const sessions = await prisma.session.findMany({
             where: {
                 studentId: studentProfile.id,
@@ -32,18 +37,20 @@ router.get('/dashboard', async (req, res) => {
                 subject: true,
             },
             orderBy: { startTime: 'asc' },
-            take: 5,
+            take: limit,
+            skip,
         });
 
-        // Progress summary
+        // 2. Recent Progress metrics (paginated)
         const progress = await prisma.progress.findMany({
             where: { studentId: studentProfile.id },
             include: { subject: true },
             orderBy: { recordedAt: 'desc' },
-            take: 10,
+            take: limit,
+            skip,
         });
 
-        // Latest messages
+        // 3. Latest Messages (paginated)
         const messages = await prisma.message.findMany({
             where: {
                 OR: [
@@ -56,7 +63,8 @@ router.get('/dashboard', async (req, res) => {
                 toUser: { select: { id: true, name: true, role: true } },
             },
             orderBy: { createdAt: 'desc' },
-            take: 10,
+            take: limit,
+            skip,
         });
 
         // Completed sessions count
@@ -73,6 +81,8 @@ router.get('/dashboard', async (req, res) => {
                 endTime: s.endTime,
                 status: s.status,
                 meetingLink: s.meetingLink,
+                zoomMeetingId: s.zoomMeetingId,
+                zoomJoinUrl: s.zoomJoinUrl,
             })),
             progress: progress.map((p) => ({
                 id: p.id,
@@ -128,7 +138,8 @@ router.post('/sessions', async (req, res) => {
             return;
         }
 
-        const session = await prisma.session.create({
+        // --- Create the DB session first ---
+        let session = await prisma.session.create({
             data: {
                 studentId: studentProfile.id,
                 tutorId,
@@ -139,9 +150,41 @@ router.post('/sessions', async (req, res) => {
             },
             include: {
                 tutor: { include: { user: { select: { name: true } } } },
+                student: { include: { user: { select: { name: true } } } },
                 subject: true,
             },
         });
+
+        // --- Auto-create a Zoom meeting ---
+        try {
+            const durationMin = Math.round(
+                (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000,
+            );
+            const topic = `${session.tutor.user.name} – ${session.student.user.name} – ${session.subject.name}`;
+
+            const zoom = await createZoomMeeting(topic, new Date(startTime).toISOString(), durationMin);
+
+            session = await prisma.session.update({
+                where: { id: session.id },
+                data: {
+                    zoomMeetingId: zoom.id,
+                    zoomJoinUrl: zoom.join_url,
+                    zoomPassword: zoom.password ?? null,
+                    meetingLink: zoom.join_url, // keep legacy field in sync
+                },
+                include: {
+                    tutor: { include: { user: { select: { name: true } } } },
+                    student: { include: { user: { select: { name: true } } } },
+                    subject: true,
+                },
+            });
+        } catch (zoomErr: any) {
+            // Log but don't fail the booking – the session still exists without Zoom.
+            // We surface zoomPending=true so the frontend can warn the student.
+            console.error('Zoom meeting creation failed (session still created):', zoomErr?.message || zoomErr);
+        }
+
+        const zoomPending = !session.zoomJoinUrl;
 
         res.status(201).json({
             session: {
@@ -151,10 +194,203 @@ router.post('/sessions', async (req, res) => {
                 startTime: session.startTime,
                 endTime: session.endTime,
                 status: session.status,
+                zoomMeetingId: session.zoomMeetingId,
+                zoomJoinUrl: session.zoomJoinUrl,
             },
+            zoomPending,
+            message: zoomPending
+                ? 'Session booked successfully. A Zoom link will be generated and sent to you shortly.'
+                : 'Session booked successfully.',
         });
     } catch (err) {
         console.error('Create session error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/student/billing
+router.get('/billing', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const skip = (page - 1) * limit;
+
+        // Fetch user's bookings (history + active)
+        const bookings = await prisma.booking.findMany({
+            where: { userId: req.user!.userId },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            skip,
+        });
+
+        // Map to format expected by frontend
+        const history = bookings.map(b => ({
+            id: b.id,
+            tier: b.tier,
+            subject: b.subject,
+            amount: b.amountPaid / 100,
+            currency: b.currency,
+            status: b.status,
+            date: b.paidAt,
+            paymentIntentId: b.stripePaymentIntentId,
+        }));
+
+        res.json({ history });
+    } catch (err) {
+        console.error('Student billing error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PATCH /api/student/profile
+router.patch('/profile', async (req, res) => {
+    try {
+        const parsed = updateProfileSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({ error: parsed.error.errors[0].message });
+            return;
+        }
+        const data: Record<string, unknown> = {};
+        if (parsed.data.name) data.name = parsed.data.name;
+
+        const user = await prisma.user.update({
+            where: { id: req.user!.userId },
+            data,
+            select: { id: true, email: true, name: true, role: true },
+        });
+        res.json({ user });
+    } catch (err) {
+        console.error('Profile update error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/student/tutors — List verified tutors (optionally filtered by subject)
+router.get('/tutors', async (req, res) => {
+    try {
+        const subject = req.query.subject as string | undefined;
+
+        const tutors = await prisma.tutorProfile.findMany({
+            where: { verificationStatus: 'VERIFIED' },
+            include: {
+                user: { select: { name: true } },
+                subjects: { include: { subject: true } },
+            },
+        });
+
+        const filtered = subject
+            ? tutors.filter(t => t.subjects.some(s => s.subject.name.toLowerCase().includes(subject.toLowerCase())))
+            : tutors;
+
+        res.json({
+            tutors: filtered.map(t => ({
+                id: t.id,
+                name: t.user.name,
+                bio: t.bio,
+                hourlyRate: t.hourlyRate,
+                subjects: t.subjects.map(s => s.subject.name),
+                verificationStatus: t.verificationStatus,
+            })),
+        });
+    } catch (err) {
+        console.error('Tutors list error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/student/messages — Conversations grouped by other user
+router.get('/messages', async (req, res) => {
+    try {
+        const userId = req.user!.userId;
+        const messages = await prisma.message.findMany({
+            where: { OR: [{ fromUserId: userId }, { toUserId: userId }] },
+            include: {
+                fromUser: { select: { id: true, name: true, role: true } },
+                toUser: { select: { id: true, name: true, role: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        // Group into conversations by the other party
+        const convos = new Map<string, { contact: { id: string; name: string; role: string }; messages: typeof messages; lastMessage: Date }>();
+        for (const m of messages) {
+            const other = m.fromUserId === userId ? m.toUser : m.fromUser;
+            if (!convos.has(other.id)) {
+                convos.set(other.id, { contact: other, messages: [], lastMessage: m.createdAt });
+            }
+            convos.get(other.id)!.messages.push(m);
+        }
+
+        res.json({
+            conversations: Array.from(convos.values())
+                .sort((a, b) => b.lastMessage.getTime() - a.lastMessage.getTime())
+                .map(c => ({
+                    contact: c.contact,
+                    lastMessage: c.messages[0]?.body || '',
+                    lastMessageAt: c.messages[0]?.createdAt,
+                    unreadCount: c.messages.filter(m => m.toUserId === userId && !m.readAt).length,
+                })),
+        });
+    } catch (err) {
+        console.error('Messages list error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/student/messages/:userId — Thread with a specific user
+router.get('/messages/:userId', async (req, res) => {
+    try {
+        const userId = req.user!.userId;
+        const otherId = req.params.userId;
+
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { fromUserId: userId, toUserId: otherId },
+                    { fromUserId: otherId, toUserId: userId },
+                ],
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        // Mark unread messages as read
+        await prisma.message.updateMany({
+            where: { fromUserId: otherId, toUserId: userId, readAt: null },
+            data: { readAt: new Date() },
+        });
+
+        res.json({
+            messages: messages.map(m => ({
+                id: m.id,
+                body: m.body,
+                isMe: m.fromUserId === userId,
+                createdAt: m.createdAt,
+            })),
+        });
+    } catch (err) {
+        console.error('Message thread error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/student/messages — Send a message
+router.post('/messages', async (req, res) => {
+    try {
+        const parsed = sendMessageSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({ error: parsed.error.errors[0].message });
+            return;
+        }
+        const message = await prisma.message.create({
+            data: {
+                fromUserId: req.user!.userId,
+                toUserId: parsed.data.toUserId,
+                body: parsed.data.body,
+            },
+        });
+        res.status(201).json({ message: { id: message.id, body: message.body, createdAt: message.createdAt } });
+    } catch (err) {
+        console.error('Send message error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

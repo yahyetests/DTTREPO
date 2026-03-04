@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 
@@ -7,9 +8,17 @@ const router = Router();
 // All admin routes require authentication + ADMIN role
 router.use(authenticate, requireRole('ADMIN'));
 
+const verifyTutorSchema = z.object({
+    id: z.string().uuid('Invalid tutor profile ID'),
+});
+
 // GET /api/admin/users
-router.get('/users', async (_req, res) => {
+router.get('/users', async (req, res) => {
     try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 50; // allow larger page size for admins
+        const skip = (page - 1) * limit;
+
         const users = await prisma.user.findMany({
             select: {
                 id: true,
@@ -22,6 +31,8 @@ router.get('/users', async (_req, res) => {
                 },
             },
             orderBy: { createdAt: 'desc' },
+            take: limit,
+            skip,
         });
 
         res.json({ users });
@@ -34,7 +45,13 @@ router.get('/users', async (_req, res) => {
 // POST /api/admin/tutors/:id/verify
 router.post('/tutors/:id/verify', async (req, res) => {
     try {
-        const { id } = req.params;
+        const parsed = verifyTutorSchema.safeParse(req.params);
+        if (!parsed.success) {
+            res.status(400).json({ error: parsed.error.errors[0].message });
+            return;
+        }
+
+        const { id } = parsed.data;
 
         const profile = await prisma.tutorProfile.findUnique({ where: { id } });
         if (!profile) {
