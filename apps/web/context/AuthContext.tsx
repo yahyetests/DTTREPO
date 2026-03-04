@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api, ApiError } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 export interface AuthUser {
     id: string;
     email: string;
     name: string;
-    role: 'STUDENT' | 'TUTOR' | 'ADMIN';
+    role: 'STUDENT' | 'TUTOR' | 'PARENT' | 'ADMIN';
 }
 
 interface AuthContextType {
@@ -22,38 +23,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Fetch current user on mount
+    // Check auth on mount — use Supabase's local session first (instant)
+    // Only hit the backend API if a session actually exists
     useEffect(() => {
-        api<{ user: AuthUser }>('/auth/me')
-            .then((data) => setUser(data.user))
-            .catch(() => setUser(null))
-            .finally(() => setLoading(false));
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session) {
+                // No session in localStorage — no need for a network call
+                setUser(null);
+                setLoading(false);
+                return;
+            }
+            // Session exists — fetch the full profile from the backend
+            api<{ user: AuthUser }>('/auth/me')
+                .then((data) => setUser(data.user))
+                .catch(() => setUser(null))
+                .finally(() => setLoading(false));
+        });
     }, []);
 
     const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
-        const data = await api<{ user: AuthUser }>('/auth/login', {
-            method: 'POST',
-            body: { email, password },
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
         });
-        setUser(data.user);
-        return data.user;
+
+        if (error) throw new Error(error.message);
+
+        // Fetch user profile from unified backend to populate full entity
+        const { user: profile } = await api<{ user: AuthUser }>('/auth/me');
+        setUser(profile);
+        return profile;
     }, []);
 
     const register = useCallback(async (name: string, email: string, password: string, role: string): Promise<AuthUser> => {
-        const data = await api<{ user: AuthUser }>('/auth/register', {
-            method: 'POST',
-            body: { name, email, password, role },
+        const { data: authData, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    name,
+                    role,
+                }
+            }
         });
-        setUser(data.user);
-        return data.user;
+
+        if (error) throw new Error('Registration failed. Please try again.');
+
+        // If Supabase requires email confirmation, the user won't have a confirmed email yet
+        if (authData.user && !authData.user.email_confirmed_at) {
+            throw new Error('CONFIRM_EMAIL');
+        }
+
+        // Immediately sync the new user to the Prisma database
+        const { user: profile } = await api<{ user: AuthUser }>('/auth/sync', {
+            method: 'POST',
+            body: { name, role },
+        });
+
+        setUser(profile);
+        return profile;
     }, []);
 
     const logout = useCallback(async () => {
-        try {
-            await api('/auth/logout', { method: 'POST' });
-        } catch {
-            // Ignore
-        }
+        await supabase.auth.signOut();
         setUser(null);
         window.location.href = '/login';
     }, []);
