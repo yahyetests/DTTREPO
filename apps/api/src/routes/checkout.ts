@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
+import { z } from 'zod';
+import { rateLimit } from '../middleware/rateLimit.js';
+import { authenticate } from '../middleware/auth.js';
+import { computeCheckoutPrice } from '../lib/pricing.js';
 
 const router = Router();
 
@@ -7,33 +11,54 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 const FRONTEND_URL = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
+// ── SECURITY: Rate-limit checkout to prevent Stripe session abuse ──
+router.use(rateLimit(20, 60_000));
+
+const checkoutSchema = z.object({
+    tier: z.enum(['platinum-path', 'gold-edge', 'silver-advantage', 'bronze-boost', 'elite-scholar', 'study-circle']),
+    level: z.enum(['gcse', 'a-level', '11-plus', 'btec']),
+    sessionMinutes: z.coerce.number().int().refine(v => [60, 90, 120].includes(v), { message: 'Session must be 60, 90, or 120 minutes' }),
+    sessionsPerWeek: z.coerce.number().int().min(1).max(7),
+    subject: z.string().optional(),
+    studentId: z.string().uuid().optional(),
+});
+
 /**
  * POST /api/checkout/create-session
- * Creates a Stripe Checkout Session in custom (embedded) UI mode.
- * Body: { tier?: string, subject?: string }
+ * Creates a Stripe Checkout Session using dynamic price_data.
  */
-router.post('/create-session', async (req, res) => {
+router.post('/create-session', authenticate, async (req, res) => {
     try {
-        const { tier, subject } = req.body || {};
+        const parsed = checkoutSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({ error: parsed.error.errors[0].message });
+            return;
+        }
 
-        // Map tier names to Stripe Price IDs from environment
-        const priceMap: Record<string, string> = {
-            'Platinum Path': process.env.STRIPE_PRICE_PLATINUM_PATH || '',
-            'Gold Edge': process.env.STRIPE_PRICE_GOLD_EDGE || '',
-            'Silver Advantage': process.env.STRIPE_PRICE_SILVER_ADVANTAGE || '',
-            'Bronze Boost': process.env.STRIPE_PRICE_BRONZE_BOOST || '',
-            'Foundational Fixes': process.env.STRIPE_PRICE_FOUNDATIONAL_FIXES || '',
-            'Foundational Focus': process.env.STRIPE_PRICE_FOUNDATIONAL_FOCUS || '',
-        };
+        const { tier, level, sessionMinutes, sessionsPerWeek, subject, studentId } = parsed.data;
+        const userId = req.user!.userId;
 
-        const priceId = priceMap[tier || ''] || priceMap['Platinum Path'] || '';
+        // ── Server-side price computation (tamper-proof) ──
+        const pricing = computeCheckoutPrice({
+            tier,
+            level,
+            sessionMinutes: Number(sessionMinutes),
+            sessionsPerWeek: Number(sessionsPerWeek),
+        });
 
         const session = await stripe.checkout.sessions.create({
             ui_mode: 'custom' as any,
             line_items: [
                 {
-                    price: priceId,
-                    quantity: 1,
+                    price_data: {
+                        currency: 'gbp',
+                        product_data: {
+                            name: pricing.productName,
+                            description: pricing.productDescription,
+                        },
+                        unit_amount: pricing.unitAmountPence,
+                    },
+                    quantity: pricing.quantity,
                 },
             ],
             mode: 'payment',
@@ -41,14 +66,20 @@ router.post('/create-session', async (req, res) => {
             automatic_tax: { enabled: true },
             metadata: {
                 tier: tier || '',
+                level: level || '',
+                sessionMinutes: String(sessionMinutes),
+                sessionsPerWeek: String(sessionsPerWeek),
                 subject: subject || '',
+                userId,
+                studentId: studentId || userId,
             },
         });
 
         res.json({ clientSecret: (session as any).client_secret });
     } catch (error: any) {
+        // SECURITY: Never leak Stripe internal errors to the client
         console.error('Stripe create-session error:', error.message);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Payment processing failed. Please try again or contact support.' });
     }
 });
 
@@ -56,11 +87,11 @@ router.post('/create-session', async (req, res) => {
  * GET /api/checkout/session-status?session_id=cs_xxx
  * Returns session status and payment details.
  */
-router.get('/session-status', async (req, res) => {
+router.get('/session-status', authenticate, async (req, res) => {
     try {
         const sessionId = req.query.session_id as string;
-        if (!sessionId) {
-            return res.status(400).json({ error: 'session_id is required' });
+        if (!sessionId || !/^cs_/.test(sessionId)) {
+            return res.status(400).json({ error: 'Valid session_id is required' });
         }
 
         const session = await stripe.checkout.sessions.retrieve(sessionId, {
@@ -76,8 +107,9 @@ router.get('/session-status', async (req, res) => {
             payment_intent_status: paymentIntent?.status || null,
         });
     } catch (error: any) {
+        // SECURITY: Never leak Stripe internal errors to the client
         console.error('Stripe session-status error:', error.message);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Unable to retrieve payment status. Please try again.' });
     }
 });
 

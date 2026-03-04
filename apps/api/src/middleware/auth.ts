@@ -1,29 +1,52 @@
 import type { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken, type TokenPayload } from '../lib/auth.js';
+import { supabase } from '../lib/supabase.js';
 
 // Extend Express Request type
 declare global {
     namespace Express {
         interface Request {
-            user?: TokenPayload;
+            user?: {
+                userId: string;
+                role: string;
+                email?: string;
+            };
         }
     }
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
-    const token = req.cookies?.access_token;
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
+    const authHeader = req.headers.authorization;
 
-    if (!token) {
-        res.status(401).json({ error: 'Authentication required' });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Authentication required. Missing Bearer token.' });
         return;
     }
 
+    const token = authHeader.split(' ')[1];
+
     try {
-        const payload = verifyAccessToken(token);
-        req.user = payload;
+        // getUser automatically verifies the token signature and expiration
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+
+        if (error || !user) {
+            console.error('Supabase Auth error:', error?.message);
+            res.status(401).json({ error: 'Invalid or expired token' });
+            return;
+        }
+
+        // Determine role: defaults to user metadata, or 'STUDENT' fallback
+        const role = user.user_metadata?.role || 'STUDENT';
+
+        req.user = {
+            userId: user.id,
+            role: role.toUpperCase(),
+            email: user.email,
+        };
+
         next();
-    } catch {
-        res.status(401).json({ error: 'Invalid or expired token' });
+    } catch (err) {
+        console.error('Unexpected Auth Middleware error:', err);
+        res.status(401).json({ error: 'Authentication failed' });
     }
 }
 
