@@ -4,8 +4,15 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🌱 Seeding database...');
+    // ── SECURITY: Never seed a production database ──
+    if (process.env.NODE_ENV === 'production') {
+        console.error('❌ REFUSING TO SEED: NODE_ENV is "production".');
+        console.error('   Seeding creates accounts with weak passwords and must never run in production.');
+        process.exit(1);
+    }
 
+    console.log('🌱 Seeding database...');
+    console.warn('⚠️  WARNING: These accounts use weak passwords and are for DEVELOPMENT ONLY.');
     // Clean existing data
     await prisma.progress.deleteMany();
     await prisma.message.deleteMany();

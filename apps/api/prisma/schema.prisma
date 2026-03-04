@@ -9,8 +9,16 @@ datasource db {
 
 enum Role {
   STUDENT
+  PARENT
   TUTOR
   ADMIN
+}
+
+enum BookingStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  COMPLETED
 }
 
 enum SessionStatus {
@@ -33,11 +41,18 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  studentProfile StudentProfile?
-  tutorProfile   TutorProfile?
+  studentProfile   StudentProfile?
+  tutorProfile     TutorProfile?
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   refreshToken     String?
+
+  // Parent ↔ Student links (many-to-many)
+  parentLinks       ParentStudentLink[] @relation("ParentUser")
+  studentLinks      ParentStudentLink[] @relation("StudentUser")
+
+  // Bookings made by this user (parent or student)
+  bookings          Booking[]
 }
 
 model StudentProfile {
@@ -60,8 +75,9 @@ model TutorProfile {
   hourlyRate         Float?
   verificationStatus VerificationStatus @default(PENDING)
 
-  subjects TutorSubject[]
-  sessions Session[]
+  subjects     TutorSubject[]
+  sessions     Session[]
+  availability TutorAvailability[]
 }
 
 model Subject {
@@ -81,6 +97,7 @@ model TutorSubject {
   subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   @@unique([tutorProfileId, subjectId])
+  @@index([subjectId])
 }
 
 model Session {
@@ -94,9 +111,16 @@ model Session {
   startTime   DateTime
   endTime     DateTime
   status      SessionStatus @default(UPCOMING)
-  meetingLink String?
-  notes       String?
-  createdAt   DateTime      @default(now())
+  meetingLink   String?
+  zoomMeetingId String?
+  zoomJoinUrl   String?
+  zoomPassword  String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  @@index([studentId])
+  @@index([tutorId])
+  @@index([subjectId])
 }
 
 model Message {
@@ -108,6 +132,9 @@ model Message {
   body       String
   createdAt  DateTime  @default(now())
   readAt     DateTime?
+
+  @@index([fromUserId])
+  @@index([toUserId])
 }
 
 model Progress {
@@ -119,4 +146,52 @@ model Progress {
   metricType String
   value      Float
   recordedAt DateTime       @default(now())
+}
+
+model ParentStudentLink {
+  id         String         @id @default(uuid())
+  parentId   String
+  parent     User           @relation("ParentUser", fields: [parentId], references: [id])
+  studentId  String
+  student    User           @relation("StudentUser", fields: [studentId], references: [id])
+  
+  @@unique([parentId, studentId])
+}
+
+model Booking {
+  id                String        @id @default(uuid())
+  userId            String                          // links to the paying parent/student
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeSessionId   String        @unique           // Stripe Checkout Session ID
+  stripeCustomerId  String?                         // Stripe Customer ID (for recurring lookups)
+  stripePaymentIntentId String?                     // for receipt/invoice retrieval
+
+  tier              String                          // e.g. "Platinum Path"
+  subject           String                          // e.g. "GCSE Maths"
+  status            BookingStatus @default(ACTIVE)
+
+  amountPaid        Int                             // in pence (Stripe uses minor units)
+  currency          String        @default("gbp")
+
+  paidAt            DateTime      @default(now())
+  lastPaymentAt     DateTime?                       // updated on recurring invoice.paid
+  cancelledAt       DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+}
+
+model TutorAvailability {
+  id             String       @id @default(uuid())
+  tutorProfileId String
+  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  dayOfWeek      Int          // 0=Monday ... 6=Sunday
+  startTime      String       // "09:00"
+  endTime        String       // "17:00"
+
+  @@index([tutorProfileId])
 }
