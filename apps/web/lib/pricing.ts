@@ -1,60 +1,100 @@
-import { pricingMatrix, getPricingKey } from "@/content/pricingMatrix";
+import {
+ pricingMatrix,
+ getPricingKey,
+ TIER_WEEKLY_PRICES,
+ LEGACY_TYPE_TO_TIER,
+ type TierKey,
+ type LevelKey,
+} from "@/content/pricingMatrix";
 
-export const BASE_RATES = {
-    "11-plus": 30,
-    "gcse": 30, // Standard base
-    "a-level": 40,
+export type Level = LevelKey;
+
+export const BASE_RATES: Record<LevelKey, number> = {
+ "11-plus": 15, // Foundational Focus baseline
+ "gcse": 50,
+ "a-level": 65,
+ "btec": 50,
 };
 
-export type Level = keyof typeof BASE_RATES;
-
 export interface PricingParams {
-    tuitionType: string;
-    level: string; // '11-plus' | 'gcse' | 'a-level'
-    sessionMinutes: number;
-    sessionsPerWeek: number;
+ tuitionType: string; // tier key e.g. 'platinum-path' or legacy '1-1-tuition'
+ level: string; // '11-plus' | 'gcse' | 'a-level' | 'btec'
+ sessionMinutes: number;
+ sessionsPerWeek: number;
 }
 
 export interface PricingResult {
-    perSession: number;
-    weekly: number;
-    monthly: number;
+ perSession: number;
+ weekly: number;
+ monthly: number;
+}
+
+/**
+ * Resolve a tuition type string to a valid TierKey.
+ * Supports both new tier keys and legacy tuition type IDs.
+ */
+function resolveTierKey(tuitionType: string): TierKey {
+ // Check if it's already a valid tier key
+ if (tuitionType in TIER_WEEKLY_PRICES) {
+ return tuitionType as TierKey;
+ }
+ // Try legacy mapping
+ if (tuitionType in LEGACY_TYPE_TO_TIER) {
+ return LEGACY_TYPE_TO_TIER[tuitionType];
+ }
+ // Default to platinum
+ return 'platinum-path';
 }
 
 export function getPrice({
-    tuitionType,
-    level,
-    sessionMinutes,
-    sessionsPerWeek,
+ tuitionType,
+ level,
+ sessionMinutes,
+ sessionsPerWeek,
 }: PricingParams): PricingResult {
 
-    // 1. Try exact match from matrix
-    const key = getPricingKey(tuitionType, level, sessionMinutes, sessionsPerWeek);
-    const rule = pricingMatrix[key];
+ const tierKey = resolveTierKey(tuitionType);
+ const levelKey = level as LevelKey;
 
-    let perSession = 0;
+ // 1. Try exact match with duration & frequency
+ const extendedKey = getPricingKey(tierKey, levelKey, sessionMinutes, sessionsPerWeek);
+ const extendedRule = pricingMatrix[extendedKey];
 
-    if (rule) {
-        // Matrix stores price per 4-session block
-        // We need per-session price for display
-        perSession = rule.price / 4;
-    } else {
-        // Fallback calculation (shouldn't happen with full matrix but good for safety)
-        // Default to GCSE base rate if not found
-        console.warn(`Pricing key not found: ${key}, using fallback.`);
-        const hourlyRate = BASE_RATES[level as Level] || 30;
-        perSession = (hourlyRate / 60) * sessionMinutes;
-    }
+ if (extendedRule) {
+ const weekly = extendedRule.perSession * sessionsPerWeek;
+ return {
+ perSession: extendedRule.perSession,
+ weekly: Math.round(weekly),
+ monthly: Math.round(weekly * 4),
+ };
+ }
 
-    // Weekly price
-    const weekly = perSession * sessionsPerWeek;
+ // 2. Try simple key (standard 4×60min)
+ const simpleKey = getPricingKey(tierKey, levelKey);
+ const simpleRule = pricingMatrix[simpleKey];
 
-    // Monthly price (based on 4 weeks per month as per user request)
-    const monthly = weekly * 4;
+ if (simpleRule) {
+ // Adjust for non-standard duration
+ const durationMult = sessionMinutes / 60;
+ const perSession = Math.round(simpleRule.perSession * durationMult);
+ const weekly = perSession * sessionsPerWeek;
 
-    return {
-        perSession: Math.round(perSession), // Round to nearest integer for clean display
-        weekly: Math.round(weekly),
-        monthly: Math.round(monthly),
-    };
+ return {
+ perSession,
+ weekly: Math.round(weekly),
+ monthly: Math.round(weekly * 4),
+ };
+ }
+
+ // 3. Fallback
+ console.warn(`Pricing key not found: tier=${tierKey}, level=${levelKey}, using fallback.`);
+ const hourlyRate = BASE_RATES[levelKey] || 30;
+ const perSession = Math.round((hourlyRate / 60) * sessionMinutes);
+ const weekly = perSession * sessionsPerWeek;
+
+ return {
+ perSession,
+ weekly: Math.round(weekly),
+ monthly: Math.round(weekly * 4),
+ };
 }

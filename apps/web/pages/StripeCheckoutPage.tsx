@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CreditCard, Loader2, ShieldCheck, Lock } from 'lucide-react';
-
-declare const Stripe: any;
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { api } from '../lib/api';
 
 interface CheckoutProps {
     tier?: string;
@@ -20,10 +20,12 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
     const checkoutRef = useRef<any>(null);
     const actionsRef = useRef<any>(null);
 
-    // Parse tier/subject from URL search params if not passed as props
     const params = new URLSearchParams(window.location.search);
-    const tierName = tier || params.get('tier') || 'Explorer';
+    const tierName = tier || params.get('tier') || 'platinum-path';
     const subjectSlug = subject || params.get('subject') || '';
+    const levelParam = params.get('level') || 'gcse';
+    const sessionMinutes = Number(params.get('sessionMinutes') || '60');
+    const sessionsPerWeek = Number(params.get('sessionsPerWeek') || '1');
 
     useEffect(() => {
         initCheckout();
@@ -31,31 +33,43 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
 
     async function initCheckout() {
         try {
-            // 1. Create checkout session on backend
-            const resp = await fetch('/api/checkout/create-session', {
+            const data = await api<{ clientSecret: string; amount: number; error?: string }>('/checkout/create-session', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tier: tierName, subject: subjectSlug }),
+                body: {
+                    tier: tierName,
+                    level: levelParam,
+                    sessionMinutes,
+                    sessionsPerWeek,
+                    subject: subjectSlug,
+                },
             });
-            const data = await resp.json();
 
-            if (!resp.ok || data.error) {
+            if (data.error) {
                 setError(data.error || 'Failed to create checkout session');
                 setLoading(false);
                 return;
             }
 
-            // 2. Initialize Stripe embedded checkout
-            const stripe = Stripe('pk_test_51SbDhTH8JpK5JEfwo09F2rJ0yhuume1cxVMQQ9YVbm3LB3Wgg5N2Ws0njPhxw20JQiI0XYxAfnG58W3ZmILP8Zuj00vlWmb4NU');
-            const checkout = stripe.initCheckout({
+            const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+            if (!stripeKey) {
+                throw new Error('Stripe publishable key is not configured. Set VITE_STRIPE_PUBLISHABLE_KEY.');
+            }
+            const stripe = await loadStripe(stripeKey);
+
+            if (!stripe) {
+                throw new Error('Stripe failed to initialize.');
+            }
+
+            // @ts-ignore - initCheckout is a newer beta API that may not be fully typed in all versions of @stripe/stripe-js yet
+            const checkout = await stripe.initCheckout({
                 clientSecret: data.clientSecret,
                 elementsOptions: {
                     appearance: {
                         theme: 'stripe',
                         variables: {
-                            colorPrimary: '#E97F0F',
-                            fontFamily: "'Poppins', sans-serif",
-                            borderRadius: '10px',
+                            colorPrimary: '#0F172A',
+                            fontFamily: "'Nunito', sans-serif",
+                            borderRadius: '14px',
                         },
                     },
                 },
@@ -72,7 +86,6 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
                 setPayAmount(session.total.total.amount);
             }
 
-            // 3. Mount elements
             const paymentElement = checkout.createPaymentElement();
             if (paymentRef.current) paymentElement.mount(paymentRef.current);
 
@@ -93,7 +106,6 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
         setSubmitting(true);
         setError(null);
 
-        // Validate email
         const email = emailRef.current?.value || '';
         if (email) {
             const result = await actionsRef.current.updateEmail(email);
@@ -109,7 +121,6 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
             setError(confirmError.message);
             setSubmitting(false);
         }
-        // If successful, Stripe redirects to the return_url automatically
     }
 
     const navigate = (href: string) => {
@@ -123,20 +134,21 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
                 {/* Back link */}
                 <button
                     onClick={() => navigate(subjectSlug ? `/subjects/${subjectSlug}` : '/subjects')}
-                    className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 mb-8 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-primary mb-8 transition-colors font-bold"
                 >
                     <ArrowLeft className="w-4 h-4" /> Back to subject
                 </button>
 
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-200">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-card"
+                        style={{ background: 'linear-gradient(135deg, #0F172A, #334155)' }}>
                         <CreditCard className="w-7 h-7 text-white" />
                     </div>
-                    <h1 className="text-2xl font-extrabold text-slate-900 mb-1">
-                        Complete Your Booking
+                    <h1 className="text-2xl font-bold text-primary mb-1">
+                        Complete Your Booking 💳
                     </h1>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-400">
                         {tierName} plan{subjectSlug ? ` · ${subjectSlug.replace(/-/g, ' ')}` : ''}
                     </p>
                 </div>
@@ -144,35 +156,35 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
                 {/* Loading state */}
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-20">
-                        <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-3" />
-                        <p className="text-sm text-slate-500">Setting up secure payment…</p>
+                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+                        <p className="text-sm text-slate-400">Setting up secure payment…</p>
                     </div>
                 )}
 
                 {/* Error state */}
                 {error && !loading && (
-                    <div className="rounded-xl bg-red-50 border border-red-200 p-4 mb-6">
-                        <p className="text-sm text-red-700">{error}</p>
+                    <div className="rounded-2xl bg-secondary/10 border border-secondary/20 p-4 mb-6">
+                        <p className="text-sm text-secondary-dark">{error}</p>
                     </div>
                 )}
 
                 {/* Checkout Form */}
                 <form
                     onSubmit={handleSubmit}
-                    className={`bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden ${loading ? 'hidden' : ''}`}
+                    className={`bg-white rounded-3xl border border-slate-200 shadow-card overflow-hidden ${loading ? 'hidden' : ''}`}
                 >
                     <div className="p-6 sm:p-8 space-y-6">
                         {/* Email */}
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+                            <label className="block text-sm font-bold text-primary mb-1.5">Email</label>
                             <input
                                 ref={emailRef}
                                 type="email"
                                 placeholder="you@example.com"
-                                className={`w-full px-4 py-3 rounded-xl border text-sm transition-all outline-none
-                                    ${emailError
-                                        ? 'border-red-400 focus:ring-2 focus:ring-red-200'
-                                        : 'border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100'
+                                className={`w-full px-4 py-3 rounded-2xl border text-sm transition-all outline-none
+ ${emailError
+                                        ? 'border-secondary/40 focus:ring-2 focus:ring-secondary/20'
+                                        : 'border-primary/15 focus:border-primary focus:ring-2 focus:ring-primary/10'
                                     }`}
                                 onChange={() => setEmailError(null)}
                                 onBlur={async () => {
@@ -182,18 +194,18 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
                                     if (result.type === 'error') setEmailError(result.error.message);
                                 }}
                             />
-                            {emailError && <p className="text-xs text-red-500 mt-1">{emailError}</p>}
+                            {emailError && <p className="text-xs text-secondary mt-1">{emailError}</p>}
                         </div>
 
                         {/* Billing Address Element */}
                         <div>
-                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Billing Address</h4>
+                            <h4 className="text-sm font-bold text-primary mb-3">Billing Address</h4>
                             <div ref={addressRef} className="min-h-[60px]" />
                         </div>
 
                         {/* Payment Element */}
                         <div>
-                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Payment</h4>
+                            <h4 className="text-sm font-bold text-primary mb-3">Payment</h4>
                             <div ref={paymentRef} className="min-h-[120px]" />
                         </div>
                     </div>
@@ -203,7 +215,8 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold text-sm shadow-lg hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-card hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            style={{ background: 'linear-gradient(135deg, #0F172A, #334155)' }}
                         >
                             {submitting ? (
                                 <>
@@ -223,7 +236,7 @@ export default function StripeCheckoutPage({ tier, subject }: CheckoutProps) {
                 {/* Trust badges */}
                 <div className="flex items-center justify-center gap-4 mt-6 text-xs text-slate-400">
                     <span className="flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5" /> SSL Encrypted
+                        <ShieldCheck className="w-3.5 h-3.5" /> 🔒 SSL Encrypted
                     </span>
                     <span className="flex items-center gap-1">
                         <Lock className="w-3.5 h-3.5" /> Powered by Stripe

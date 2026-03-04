@@ -7,13 +7,12 @@ import {
 } from "lucide-react";
 import { getSubjectBySlug } from "@/content/subjects";
 import { mockTutors, matchTutors, type MockTutor, type LectureType } from "@/content/mockTutors";
-import { getStripeLinksForSubject, StripeTierLink } from "@/content/stripe-links";
 import { pricingTiers } from "@/content/site-content";
 import { useStudentPurchases } from "@/context/StudentPurchasesContext";
-import { validateStripeUrlOrThrow } from "@/lib/stripe-validators";
 import { cn } from "@/lib/utils";
 import { getPrice, Level, BASE_RATES } from "@/lib/pricing";
 import { tuitionTypes, TuitionType } from "@/content/tuitionTypes";
+import { useDocumentHead } from "@/lib/useDocumentHead";
 
 interface BookingPageProps {
     slug: string;
@@ -42,10 +41,12 @@ const TIME_SLOTS = [
 // Helper to get icon for tuition type
 const getTuitionIcon = (id: string) => {
     switch (id) {
-        case '1-1-tuition': return <Users className="w-5 h-5" />;
-        case 'group-tuition': return <Users className="w-5 h-5" />; // Could use a different icon
-        case 'intensive-revision': return <Zap className="w-5 h-5" />;
-        case 'homework-support': return <BookOpen className="w-5 h-5" />;
+        case 'platinum-path': return <Users className="w-5 h-5" />;
+        case 'gold-edge': return <Users className="w-5 h-5" />;
+        case 'silver-advantage': return <Users className="w-5 h-5" />;
+        case 'bronze-boost': return <Users className="w-5 h-5" />;
+        case 'foundational-fixes': return <Zap className="w-5 h-5" />;
+        case 'foundational-focus': return <BookOpen className="w-5 h-5" />;
         default: return <GraduationCap className="w-5 h-5" />;
     }
 };
@@ -54,11 +55,16 @@ export default function BookingPage({ slug }: BookingPageProps) {
     const subject = getSubjectBySlug(slug);
     const { storeBookingToken } = useStudentPurchases();
 
+    useDocumentHead({
+        title: subject ? `Book ${subject.name} Tuition` : "Book Tuition",
+        description: subject ? `Book your personalised ${subject.name} tuition course at Takween Tutors.` : "Book your tuition course.",
+    });
+
     // State
     const [step, setStep] = useState<Step>("schedule");
 
-    // New State: Tuition Type (Default to 1:1)
-    const [selectedTuitionTypeId, setSelectedTuitionTypeId] = useState<string>("1-1-tuition");
+    // New State: Tuition Type (Default to Platinum Path 1:1)
+    const [selectedTuitionTypeId, setSelectedTuitionTypeId] = useState<string>("platinum-path");
 
     const [sessionLength, setSessionLength] = useState<number>(60); // minutes
     const [freqCount, setFreqCount] = useState<number>(1);
@@ -77,13 +83,13 @@ export default function BookingPage({ slug }: BookingPageProps) {
 
 
     // Derived
-    const stripeLinks = subject ? getStripeLinksForSubject(subject.slug) : [];
 
     // Level Logic
     const level: string = useMemo(() => {
         if (!slug) return 'gcse';
         if (slug.includes('a-level')) return 'a-level';
         if (slug.includes('11-plus')) return '11-plus';
+        if (slug.includes('btec')) return 'btec';
         return 'gcse';
     }, [slug]);
 
@@ -100,23 +106,6 @@ export default function BookingPage({ slug }: BookingPageProps) {
         sessionsPerWeek: freqCount
     }), [selectedTuitionTypeId, level, sessionLength, freqCount]);
 
-    // Find the Stripe link. 
-    // Logic update: Keys in stripe-links.ts need to match this.
-    // Check if we have a specific link for this Tuition Type.
-    // If not, we might need a fallback or show error as per requirements.
-    const matchedPlan = useMemo(() => {
-        // We look for a link where the tierName roughly matches our tuition type or generic
-        // For now, we reuse the existing "Platinum/Gold" logic if it maps to 1:1, 
-        // OR we try to find a link that matches the ID.
-
-        // TODO: In a real scenario, stripe-links.ts would have exact keys.
-        // For MVP/Mock, we fallback to the first available link but warn if price mismatch.
-        // We'll trust the mock payment flow to handle the amount.
-
-        const link = stripeLinks[0]; // Logic placeholder until stripe-links.ts is fully updated
-        return { link, price: pricing.perSession };
-    }, [stripeLinks, pricing.perSession]);
-
     // Derived totals for Display
     const finalPerSession = pricing.perSession;
     const finalWeekly = pricing.weekly;
@@ -125,10 +114,10 @@ export default function BookingPage({ slug }: BookingPageProps) {
     // If invalid slug
     if (!subject) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center bg-white ">
                 <div className="text-center">
-                    <h1 className="text-2xl font-bold text-slate-900">Subject Not Found</h1>
-                    <a href="/subjects" className="text-primary hover:underline mt-4 inline-block">Return to Subjects</a>
+                    <h1 className="text-2xl font-bold text-primary ">Subject Not Found</h1>
+                    <a href="/subjects" className="text-primary font-bold hover:underline mt-4 inline-block">Return to Subjects</a>
                 </div>
             </div>
         );
@@ -161,93 +150,85 @@ export default function BookingPage({ slug }: BookingPageProps) {
         setStep("review");
     };
 
-    // Handler: Finalize & Redirect
+    // Handler: Finalize & Redirect to Stripe Checkout
     const handleConfirm = () => {
         if (!selectedTutor || !selectedDate || !selectedTime) return;
 
-        // Use matched tier key
-        const finalTier = matchedPlan.link;
-        if (!finalTier) {
-            setError("This booking option isn’t available for online payment yet. Please contact support.");
-            return;
-        }
+        // Store Token for post-payment UI
+        const nextLessonISO = new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            parseInt(selectedTime.split(':')[0]),
+            parseInt(selectedTime.split(':')[1])
+        ).toISOString();
 
-        try {
-            // Validate URL (T1 fix)
-            validateStripeUrlOrThrow(finalTier.stripeUrl);
+        storeBookingToken({
+            subjectSlug: subject.slug,
+            subjectName: subject.name,
+            tutorId: selectedTutor.id,
+            tutorName: selectedTutor.name,
+            nextLessonISO,
+            frequency: freqCount === 1 ? "Monthly" : `${freqCount}x Monthly`,
+            sessionLength,
+            planTier: selectedTuitionType.label,
+            preferredTime: selectedTime,
+        });
 
-            // Store Token (T2 requirement)
-            const nextLessonISO = new Date(
-                selectedDate.getFullYear(),
-                selectedDate.getMonth(),
-                selectedDate.getDate(),
-                parseInt(selectedTime.split(':')[0]),
-                parseInt(selectedTime.split(':')[1])
-            ).toISOString();
+        // Build query params for the dynamic checkout page
+        const params = new URLSearchParams({
+            tier: selectedTuitionTypeId,
+            level,
+            sessionMinutes: String(sessionLength),
+            sessionsPerWeek: String(freqCount),
+            subject: subject.slug,
+        });
 
-            storeBookingToken({
-                subjectSlug: subject.slug,
-                subjectName: subject.name,
-                tutorId: selectedTutor.id,
-                tutorName: selectedTutor.name,
-                nextLessonISO,
-                frequency: freqCount === 1 ? "Weekly" : `${freqCount}x Weekly`,
-                sessionLength,
-                planTier: selectedTuitionType.label, // Use tuition type label
-                preferredTime: selectedTime,
-                // Add tuitionType specific fields if needed in token
-            });
-
-            // Redirect
-            window.location.href = finalTier.stripeUrl;
-
-        } catch (err: any) {
-            setError(err.message || "Failed to initiate checkout");
-        }
+        window.location.href = `/checkout?${params.toString()}`;
     };
 
     // Render Steps
     return (
-        <div className="min-h-screen bg-slate-50 pb-20">
+        <div className="min-h-screen bg-white pb-20">
             {/* Header */}
-            <header className="bg-white border-b sticky top-0 z-10">
-                <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-                    <button onClick={() => window.history.back()} className="p-2 hover:bg-slate-100 rounded-full">
-                        <ArrowLeft className="w-5 h-5 text-slate-600" />
+            <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+                    <button onClick={() => window.history.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                        <ArrowLeft className="w-5 h-5 text-primary " />
                     </button>
-                    <span className="font-semibold text-slate-900">Booking {subject.name}</span>
-                    <div className="w-9" /> {/* Spacer */}
+                    <span className="font-bold text-primary ">Booking {subject.name} 🦊</span>
+                    <div className="w-9" />
                 </div>
                 {/* Progress Bar */}
                 <div className="max-w-3xl mx-auto px-4 pb-0">
-                    <div className="flex items-center gap-2 text-sm font-medium py-3 border-t">
-                        <span className={cn("flex items-center gap-2", step === "schedule" ? "text-primary" : "text-green-600")}>
-                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs", step === "schedule" ? "bg-primary text-white" : "bg-green-100 text-green-700")}>
+                    <div className="flex items-center gap-2 text-sm font-bold py-3 border-t border-slate-100 ">
+                        <span className={cn("flex items-center gap-2", step === "schedule" ? "text-primary " : "text-accent")}>
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs", step === "schedule" ? "bg-primary text-white" : "bg-accent/15 text-accent")}>
                                 {step !== "schedule" ? <CheckCircle2 className="w-4 h-4" /> : "1"}
                             </div>
                             Schedule
                         </span>
-                        <div className="h-px w-8 bg-slate-200" />
-                        <span className={cn("flex items-center gap-2", step === "tutor" ? "text-primary" : step === "review" ? "text-green-600" : "text-slate-400")}>
-                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs", step === "tutor" ? "bg-primary text-white" : step === "review" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")}>
+                        <div className="h-px w-8 bg-primary/10" />
+                        <span className={cn("flex items-center gap-2", step === "tutor" ? "text-primary " : step === "review" ? "text-accent" : "text-slate-400")}>
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs", step === "tutor" ? "bg-primary text-white" : step === "review" ? "bg-accent/15 text-accent" : "bg-slate-100 text-slate-400")}>
                                 {step === "review" ? <CheckCircle2 className="w-4 h-4" /> : "2"}
                             </div>
                             Tutor
                         </span>
-                        <div className="h-px w-8 bg-slate-200" />
-                        <span className={cn("flex items-center gap-2", step === "review" ? "text-primary" : "text-slate-400")}>
-                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs", step === "review" ? "bg-primary text-white" : "bg-slate-100 text-slate-500")}>3</div>
+                        <div className="h-px w-8 bg-primary/10" />
+                        <span className={cn("flex items-center gap-2", step === "review" ? "text-primary " : "text-slate-400")}>
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs", step === "review" ? "bg-primary text-white" : "bg-slate-100 text-slate-400")}>3</div>
                             Review
                         </span>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-3xl mx-auto px-4 py-8">
+            <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
                 {/* Error Banner */}
                 {error && (
-                    <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex gap-3">
+                    <div className="mb-6 bg-secondary/10 border border-secondary/30 text-secondary-dark p-4 rounded-2xl flex gap-3">
                         <AlertCircle className="w-5 h-5 shrink-0" />
                         <p>{error}</p>
                     </div>
@@ -258,32 +239,32 @@ export default function BookingPage({ slug }: BookingPageProps) {
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {/* 1. Tuition Type Selector */}
                         <section>
-                            <h2 className="text-xl font-bold text-slate-900 mb-4">Choose your tuition type</h2>
+                            <h2 className="text-xl font-bold text-primary mb-4">Choose your tuition type 📋</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {tuitionTypes.map((type) => (
                                     <button
                                         key={type.id}
                                         onClick={() => setSelectedTuitionTypeId(type.id)}
                                         className={cn(
-                                            "relative p-4 rounded-xl border-2 text-left transition-all hover:border-indigo-300 hover:bg-indigo-50/30",
+                                            "relative p-4 rounded-2xl border-2 text-left transition-all hover:border-primary/40 hover:bg-slate-100 ",
                                             selectedTuitionTypeId === type.id
-                                                ? "border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600"
-                                                : "border-slate-200 bg-white"
+                                                ? "border-primary bg-slate-100 ring-1 ring-primary/30"
+                                                : "border-slate-200 bg-white "
                                         )}
                                     >
                                         {/* Optional Badge */}
                                         {type.badge && (
-                                            <span className="absolute -top-3 right-4 bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-orange-200 uppercase tracking-wide">
+                                            <span className="absolute -top-3 right-4 bg-secondary/15 text-secondary-dark text-[10px] font-bold px-2 py-0.5 rounded-full border border-secondary/20 uppercase tracking-wide">
                                                 {type.badge}
                                             </span>
                                         )}
 
                                         <div className="flex items-start gap-3">
-                                            <div className={cn("p-2 rounded-lg bg-white shadow-sm border", selectedTuitionTypeId === type.id ? "text-indigo-600 border-indigo-200" : "text-slate-500 border-slate-100")}>
+                                            <div className={cn("p-2 rounded-xl bg-white shadow-soft border", selectedTuitionTypeId === type.id ? "text-primary border-primary/20" : "text-slate-400 border-slate-100 ")}>
                                                 {getTuitionIcon(type.id)}
                                             </div>
                                             <div>
-                                                <h3 className={cn("font-bold text-sm", selectedTuitionTypeId === type.id ? "text-indigo-900" : "text-slate-900")}>
+                                                <h3 className={cn("font-bold text-sm", selectedTuitionTypeId === type.id ? "text-primary " : "text-primary ")}>
                                                     {type.label}
                                                 </h3>
                                                 <p className="text-xs text-slate-500 mt-1 leading-snug">
@@ -291,7 +272,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                                                 </p>
                                                 {type.bestFor && (
                                                     <div className="mt-2 text-[10px] font-medium text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                                                        <Star className="w-3 h-3 text-amber-400 fill-current" />
+                                                        <Star className="w-3 h-3 text-secondary fill-current" />
                                                         Best for {type.bestFor}
                                                     </div>
                                                 )}
@@ -303,35 +284,35 @@ export default function BookingPage({ slug }: BookingPageProps) {
                         </section>
 
                         <section>
-                            <h2 className="text-lg font-bold text-slate-900 mb-4">Frequency & Duration</h2>
+                            <h2 className="text-lg font-bold text-primary mb-4">Frequency & Duration ⏰</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                                 <div className="space-y-4">
-                                    <label className="text-xs font-semibold text-slate-500 uppercase">Sessions Per Week</label>
-                                    <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-slate-200">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Sessions Per Month</label>
+                                    <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 ">
                                         <button
                                             onClick={() => setFreqCount(Math.max(1, freqCount - 1))}
-                                            className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-primary/10 text-primary transition-colors font-bold"
                                         >-</button>
-                                        <span className="flex-1 text-center font-bold text-xl">{freqCount}</span>
+                                        <span className="flex-1 text-center font-bold text-xl text-primary ">{freqCount}</span>
                                         <button
                                             onClick={() => setFreqCount(Math.min(7, freqCount + 1))}
                                             className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
                                         >+</button>
                                     </div>
                                     <p className="text-xs text-slate-400 text-center">
-                                        {freqCount === 1 ? "Weekly" : `${freqCount} times per week`}
+                                        {freqCount === 1 ? "Once monthly" : `${freqCount} times per month`}
                                     </p>
                                 </div>
                                 <div className="space-y-4">
-                                    <label className="text-xs font-semibold text-slate-500 uppercase">Session Length</label>
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Session Length</label>
                                     <div className="flex gap-2">
                                         {[60, 90, 120].map(mins => (
                                             <button
                                                 key={mins}
                                                 onClick={() => setSessionLength(mins)}
                                                 className={cn(
-                                                    "px-3 py-3 rounded-lg text-sm border flex-1 transition-all flex flex-col items-center justify-center gap-1",
-                                                    sessionLength === mins ? "border-primary bg-primary/5 text-primary font-bold ring-2 ring-primary/20" : "border-slate-200 hover:border-slate-300 bg-white"
+                                                    "px-3 py-3 rounded-2xl text-sm border flex-1 transition-all flex flex-col items-center justify-center gap-1 font-bold",
+                                                    sessionLength === mins ? "border-primary bg-slate-100 text-primary ring-2 ring-primary/20" : "border-slate-200 hover:border-primary/30 bg-white "
                                                 )}
                                             >
                                                 <span>{mins}m</span>
@@ -342,42 +323,37 @@ export default function BookingPage({ slug }: BookingPageProps) {
                             </div>
 
                             {/* Live Price Summary Card */}
-                            <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg mb-8 transform transition-all">
+                            <div className="text-white p-6 rounded-3xl shadow-card mb-8 transform transition-all" style={{ background: 'linear-gradient(135deg, #0F172A, #1E293B)' }}>
                                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                                     <div className="text-center md:text-left">
                                         <div className="text-2xl font-bold text-white">
-                                            £{finalWeekly} <span className="text-sm font-normal text-slate-400">/ week</span>
+                                            £{finalWeekly} <span className="text-sm font-normal text-white/60">/ month</span>
                                         </div>
-                                        <div className="text-sm text-slate-400 mt-1">
-                                            £{finalPerSession} per session
+                                        <div className="text-sm text-white/70 mt-1">
+                                            £{finalPerSession} per session • {selectedTuitionType.ratio} ratio
                                         </div>
-                                        <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-800">
-                                            Based on: {selectedTuitionType.label} • {level === '11-plus' ? '11+' : level.toUpperCase()} • {sessionLength} mins • {freqCount}x/week
+                                        <div className="text-xs text-white/40 mt-2 pt-2 border-t border-white/15">
+                                            Based on: {selectedTuitionType.label} • {level === '11-plus' ? '11+' : level === 'a-level' ? 'A-Level' : level === 'btec' ? 'BTEC' : 'GCSE'} • {sessionLength} mins • {freqCount}x/month
                                         </div>
                                     </div>
-                                    <div className="text-center md:text-right border-t md:border-t-0 pt-4 md:pt-0 mt-4 md:mt-0">
-                                        <div className="text-sm font-medium text-slate-500 uppercase tracking-wide">
+                                    <div className="text-center md:text-right border-t md:border-t-0 border-white/15 pt-4 md:pt-0 mt-4 md:mt-0">
+                                        <div className="text-sm font-bold text-white/50 uppercase tracking-wide">
                                             Monthly Estimate
                                         </div>
-                                        <div className="text-3xl font-bold text-indigo-400">
+                                        <div className="text-3xl font-bold text-secondary-light">
                                             £{finalMonthly}
                                         </div>
-                                        <div className="text-xs text-slate-400 mt-1">
+                                        <div className="text-xs text-white/40 mt-1">
                                             (4 weeks/mo)
                                         </div>
                                     </div>
                                 </div>
-                                {!matchedPlan.link && (
-                                    <div className="mt-4 pt-4 border-t border-slate-700 text-xs text-orange-400 flex items-center gap-2">
-                                        <AlertCircle className="w-3 h-3" />
-                                        <span>Standard rates apply.</span>
-                                    </div>
-                                )}
+
                             </div>
                         </section>
 
                         <section>
-                            <h2 className="text-lg font-bold text-slate-900 mb-4">Choose a Date</h2>
+                            <h2 className="text-lg font-bold text-primary mb-4">Choose a Date 📅</h2>
                             {/* Horizontal Date Picker */}
                             <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                                 {getNext14Days().map((d, i) => {
@@ -387,11 +363,11 @@ export default function BookingPage({ slug }: BookingPageProps) {
                                             key={i}
                                             onClick={() => setSelectedDate(d)}
                                             className={cn(
-                                                "flex-shrink-0 w-20 p-3 rounded-xl border text-center transition-all",
-                                                isSelected ? "border-primary bg-primary text-white shadow-md scale-105" : "border-slate-200 bg-white hover:border-slate-300"
+                                                "flex-shrink-0 w-20 p-3 rounded-2xl border text-center transition-all",
+                                                isSelected ? "border-primary bg-primary text-white shadow-card scale-105" : "border-slate-200 bg-white hover:border-primary/30"
                                             )}
                                         >
-                                            <div className={cn("text-xs font-medium mb-1", isSelected ? "text-white/80" : "text-slate-400")}>
+                                            <div className={cn("text-xs font-bold mb-1", isSelected ? "text-white/80" : "text-slate-400")}>
                                                 {d.toLocaleDateString('en-US', { weekday: 'short' })}
                                             </div>
                                             <div className="text-xl font-bold">
@@ -404,15 +380,15 @@ export default function BookingPage({ slug }: BookingPageProps) {
                         </section>
 
                         <section>
-                            <h2 className="text-lg font-bold text-slate-900 mb-4">Available Times</h2>
+                            <h2 className="text-lg font-bold text-primary mb-4">Available Times ⏰</h2>
                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                                 {TIME_SLOTS.map(time => (
                                     <button
                                         key={time}
                                         onClick={() => setSelectedTime(time)}
                                         className={cn(
-                                            "py-2.5 rounded-lg text-sm font-medium border transition-all",
-                                            selectedTime === time ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-slate-200 hover:border-orange-200 bg-white"
+                                            "py-2.5 rounded-2xl text-sm font-bold border transition-all",
+                                            selectedTime === time ? "border-primary bg-slate-100 text-primary shadow-soft" : "border-slate-200 hover:border-primary/30 bg-white "
                                         )}
                                     >
                                         {time}
@@ -421,13 +397,14 @@ export default function BookingPage({ slug }: BookingPageProps) {
                             </div>
                         </section>
 
-                        <div className="pt-6 border-t mt-8">
+                        <div className="pt-6 border-t border-slate-100 mt-8">
                             <button
                                 onClick={handleScheduleSubmit}
                                 disabled={!selectedDate || !selectedTime}
-                                className="w-full sm:w-auto ml-auto px-8 py-4 bg-slate-900 text-white rounded-full font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl"
+                                className="w-full sm:w-auto ml-auto px-8 py-4 text-white rounded-full font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-card hover:shadow-lg hover:-translate-y-1"
+                                style={{ background: 'linear-gradient(135deg, #0F172A, #334155)' }}
                             >
-                                Find Tutors <ChevronRight className="w-5 h-5" />
+                                Find Tutors 🔍 <ChevronRight className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
@@ -438,46 +415,46 @@ export default function BookingPage({ slug }: BookingPageProps) {
                     step === "tutor" && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
                             <div className="flex justify-between items-end mb-2">
-                                <h2 className="text-xl font-bold text-slate-900">Your Matches</h2>
-                                <p className="text-sm text-slate-500">
+                                <h2 className="text-xl font-bold text-primary ">Your Matches 🎯</h2>
+                                <p className="text-sm text-slate-500 ">
                                     Showing {availableTutors.length} tutors available on {selectedDate?.toLocaleDateString()} at {selectedTime}
                                 </p>
                             </div>
 
                             <div className="grid gap-4">
                                 {availableTutors.map(({ tutor, score, matchReasons }) => (
-                                    <div key={tutor.id} className="bg-white border text-left p-5 rounded-2xl hover:border-orange-200 hover:shadow-md transition-all group relative overflow-hidden">
+                                    <div key={tutor.id} className="bg-white border border-slate-200 text-left p-5 rounded-3xl hover:border-secondary/30 hover:shadow-card transition-all group relative overflow-hidden">
                                         {/* Badge for top match */}
                                         {score > 25 && (
-                                            <div className="absolute top-0 right-0 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-bl-xl">
-                                                BEST MATCH
+                                            <div className="absolute top-0 right-0 bg-secondary/15 text-secondary-dark text-xs font-bold px-3 py-1 rounded-bl-2xl">
+                                                ⭐ BEST MATCH
                                             </div>
                                         )}
 
                                         <div className="flex gap-4">
-                                            <img src={tutor.imageUrl} alt={tutor.name} className="w-16 h-16 rounded-full object-cover border-2 border-slate-100" />
+                                            <img src={tutor.imageUrl} alt={tutor.name} className="w-16 h-16 rounded-full object-cover ring-2 ring-secondary/20" />
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start">
                                                     <div>
-                                                        <h3 className="font-bold text-lg text-slate-900">{tutor.name}</h3>
-                                                        <div className="flex items-center gap-1 text-amber-500 text-sm font-medium">
+                                                        <h3 className="font-bold text-lg text-primary ">{tutor.name}</h3>
+                                                        <div className="flex items-center gap-1 text-secondary text-sm font-bold">
                                                             <Star className="w-4 h-4 fill-current" /> {tutor.rating} <span className="text-slate-400 font-normal">({tutor.reviewCount} reviews)</span>
                                                         </div>
                                                     </div>
                                                     <button
                                                         onClick={() => handleTutorSelect(tutor)}
-                                                        className="hidden sm:block px-5 py-2 rounded-full bg-slate-900 text-white font-medium hover:bg-slate-800 transition-colors"
+                                                        className="hidden sm:block px-5 py-2 rounded-full bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-soft"
                                                     >
                                                         Select
                                                     </button>
                                                 </div>
 
-                                                <p className="text-sm text-slate-600 mt-2 line-clamp-2">{tutor.bio}</p>
+                                                <p className="text-sm text-slate-500 mt-2 line-clamp-2">{tutor.bio}</p>
 
                                                 <div className="flex flex-wrap gap-2 mt-3">
                                                     {matchReasons.slice(0, 3).map(reason => (
-                                                        <span key={reason} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-medium">
-                                                            <CheckCircle2 className="w-3 h-3 text-green-500" /> {reason}
+                                                        <span key={reason} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-primary/60 font-bold">
+                                                            <CheckCircle2 className="w-3 h-3 text-accent" /> {reason}
                                                         </span>
                                                     ))}
                                                 </div>
@@ -486,7 +463,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                                         {/* Mobile select button */}
                                         <button
                                             onClick={() => handleTutorSelect(tutor)}
-                                            className="sm:hidden w-full mt-4 py-3 rounded-xl bg-slate-900 text-white font-medium"
+                                            className="sm:hidden w-full mt-4 py-3 rounded-2xl bg-primary text-white font-bold shadow-soft"
                                         >
                                             Select Tutor
                                         </button>
@@ -494,8 +471,8 @@ export default function BookingPage({ slug }: BookingPageProps) {
                                 ))}
 
                                 {availableTutors.length === 0 && (
-                                    <div className="text-center py-12 border-2 border-dashed rounded-2xl">
-                                        <p className="text-slate-500 mb-4">No tutors found for this specific slot.</p>
+                                    <div className="text-center py-12 border-2 border-dashed border-primary/15 rounded-3xl bg-white ">
+                                        <p className="text-slate-400 mb-4">No tutors found for this specific slot.</p>
                                         <button onClick={() => setStep("schedule")} className="text-primary font-medium hover:underline">
                                             Change time preferences
                                         </button>
@@ -510,68 +487,75 @@ export default function BookingPage({ slug }: BookingPageProps) {
                 {
                     step === "review" && selectedTutor && selectedDate && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500 max-w-xl mx-auto">
-                            <div className="bg-white border rounded-2xl p-6 shadow-sm">
-                                <h2 className="text-xl font-bold text-slate-900 mb-6">Booking Summary</h2>
+                            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-card">
+                                <h2 className="text-xl font-bold text-primary mb-6">Booking Summary 📝</h2>
 
-                                <div className="flex items-center gap-4 mb-6 pb-6 border-b">
-                                    <img src={selectedTutor.imageUrl} className="w-16 h-16 rounded-full" />
+                                <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100 ">
+                                    <img src={selectedTutor.imageUrl} className="w-16 h-16 rounded-full ring-2 ring-secondary/20" />
                                     <div>
-                                        <p className="text-sm text-slate-500">Tutor</p>
+                                        <p className="text-sm text-slate-400">Tutor</p>
                                         <h3 className="font-bold text-lg">{selectedTutor.name}</h3>
                                         <p className="text-sm text-slate-600 flex items-center gap-1">
-                                            <ShieldCheck className="w-3.5 h-3.5 text-blue-500" /> Verified Tutor
+                                            <ShieldCheck className="w-3.5 h-3.5 text-accent" /> Verified Tutor
                                         </p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500 flex items-center gap-2"><Calendar className="w-4 h-4" /> Date</span>
-                                        <span className="font-medium text-slate-900">
+                                        <span className="text-slate-400 flex items-center gap-2"><Calendar className="w-4 h-4" /> Date</span>
+                                        <span className="font-bold text-primary ">
                                             {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500 flex items-center gap-2"><Clock className="w-4 h-4" /> Time</span>
-                                        <span className="font-medium text-slate-900">{selectedTime}</span>
+                                        <span className="text-slate-400 flex items-center gap-2"><Clock className="w-4 h-4" /> Time</span>
+                                        <span className="font-bold text-primary ">{selectedTime}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500">Subject</span>
+                                        <span className="text-slate-400">Subject</span>
                                         <span className="font-medium">{subject.name}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500">Option</span>
+                                        <span className="text-slate-400">Option</span>
                                         <span className="font-medium">{selectedTuitionType.label}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500">Scheduled</span>
-                                        <span className="font-medium">{sessionLength} mins • {freqCount > 1 ? `${freqCount}x / week` : 'Weekly'}</span>
+                                        <span className="text-slate-400">Ratio</span>
+                                        <span className="font-medium">{selectedTuitionType.ratio} student-to-tutor</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500">Rate</span>
-                                        <span className="font-medium text-slate-900">£{finalPerSession} / session</span>
+                                        <span className="text-slate-400">Scheduled</span>
+                                        <span className="font-medium">{sessionLength} mins • {freqCount > 1 ? `${freqCount}x / month` : 'Weekly'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Monthly Rate</span>
+                                        <span className="font-bold text-primary ">£{finalWeekly} / month</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Per Session</span>
+                                        <span className="font-bold text-primary ">£{finalPerSession} / session</span>
                                     </div>
                                 </div>
 
-                                <div className="mt-8 pt-6 border-t flex justify-between items-center">
+                                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
                                     <div>
-                                        <p className="text-sm text-slate-500 mb-1">Total to pay today (1st Session)</p>
-                                        <p className="text-3xl font-bold text-slate-900">£{finalPerSession}</p>
+                                        <p className="text-sm text-slate-400 mb-1">Monthly total (4 sessions)</p>
+                                        <p className="text-3xl font-bold text-primary ">£{finalWeekly}</p>
                                         <p className="text-xs text-slate-400 mt-1">~ £{finalMonthly}/mo est.</p>
                                     </div>
-                                    {stripeLinks.length > 0 && (
-                                        <div className="text-right">
-                                            <span className="text-xs text-slate-400">Secured by Stripe</span>
-                                        </div>
-                                    )}
+                                    <div className="text-right">
+                                        <span className="text-xs text-slate-400">🔒 Secured by Stripe</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <button
                                 onClick={handleConfirm}
-                                className="w-full py-4 text-center rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-amber-600 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 text-center rounded-full text-white font-bold text-lg shadow-card hover:shadow-lg hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+                                style={{ background: 'linear-gradient(135deg, #0F172A, #334155)' }}
                             >
-                                Proceed to Payment <ArrowLeft className="w-5 h-5 rotate-180" />
+                                Proceed to Payment 🚀 <ArrowLeft className="w-5 h-5 rotate-180" />
                             </button>
 
                             <p className="text-xs text-center text-slate-400 mt-4">

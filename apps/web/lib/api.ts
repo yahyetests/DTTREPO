@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+import { supabase } from './supabase';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface FetchOptions extends Omit<RequestInit, 'body'> {
     body?: unknown;
@@ -10,10 +12,25 @@ export async function api<T = unknown>(
 ): Promise<T> {
     const { body, headers, ...rest } = options;
 
+    // Manually get the latest session from Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const baseHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    };
+
+    if (token) {
+        baseHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
-        credentials: 'include',
+        // No longer relying strictly on cookies for auth, but still send cookies for
+        // things like rate limit tracking or non-auth cookies if any exist.
+        credentials: 'omit',
         headers: {
-            'Content-Type': 'application/json',
+            ...baseHeaders,
             ...headers,
         },
         body: body ? JSON.stringify(body) : undefined,
@@ -21,35 +38,10 @@ export async function api<T = unknown>(
     });
 
     if (res.status === 401) {
-        // Try refresh
-        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-            method: 'POST',
-            credentials: 'include',
-        });
-
-        if (refreshRes.ok) {
-            // Retry original request
-            const retryRes = await fetch(`${API_BASE}${path}`, {
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...headers,
-                },
-                body: body ? JSON.stringify(body) : undefined,
-                ...rest,
-            });
-
-            if (!retryRes.ok) {
-                const err = await retryRes.json().catch(() => ({ error: 'Request failed' }));
-                throw new ApiError(retryRes.status, err.error || 'Request failed');
-            }
-
-            return retryRes.json();
-        }
-
-        // Refresh failed — redirect to login
+        // Token is invalid/missing. Supabase handles its own refresh transparently
+        // when getSession() is called. If that failed, the user is genuinely logged out.
         window.location.href = '/login';
-        throw new ApiError(401, 'Session expired');
+        throw new ApiError(401, 'Session expired or unauthorized');
     }
 
     if (!res.ok) {

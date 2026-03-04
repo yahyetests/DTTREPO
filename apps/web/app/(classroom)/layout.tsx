@@ -2,18 +2,18 @@
 import React from "react";
 
 export const metadata = {
-  title: "Takween Live Classroom",
-  description: "Virtual Classroom Environment",
+ title: "Takween Live Classroom",
+ description: "Virtual Classroom Environment",
 };
 
 export default function ClassroomLayout({
-  children,
+ children,
 }: {
-  children?: React.ReactNode;
+ children?: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
-      {children}
-    </div>
-  );
+ return (
+ <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
+ {children}
+ </div>
+ );
 }
