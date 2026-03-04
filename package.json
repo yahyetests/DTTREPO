@@ -10,9 +10,13 @@
         "db:seed": "cd apps/api && npx prisma db seed",
         "db:reset": "cd apps/api && npx prisma migrate reset --force",
         "build": "cd apps/web && npm run build",
-        "typecheck": "cd apps/web && npm run typecheck && cd ../api && npm run typecheck"
+        "typecheck": "cd apps/web && npm run typecheck && cd ../api && npm run typecheck",
+        "audit": "node scripts/audit.js"
     },
     "devDependencies": {
+        "@vercel/node": "^5.6.10",
+        "axios": "^1.6.0",
+        "cheerio": "^1.0.0-rc.12",
         "concurrently": "^8.2.2"
     }
 }
