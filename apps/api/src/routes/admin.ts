@@ -71,4 +71,62 @@ router.post('/tutors/:id/verify', async (req, res) => {
     }
 });
 
+// GET /api/admin/jobs
+router.get('/jobs', async (req, res) => {
+    try {
+        const jobs = await prisma.jobOpening.findMany({
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json({ jobs });
+    } catch (err) {
+        console.error('Admin GET jobs error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+const createJobSchema = z.object({
+    title: z.string().min(1, 'Title is required'),
+    type: z.string().min(1, 'Type is required'),
+    department: z.string().min(1, 'Department is required'),
+    description: z.string().optional(),
+    isActive: z.boolean().optional().default(true),
+});
+
+// POST /api/admin/jobs
+router.post('/jobs', async (req, res) => {
+    try {
+        const parsed = createJobSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({ error: parsed.error.errors[0].message });
+            return;
+        }
+
+        const job = await prisma.jobOpening.create({
+            data: {
+                ...parsed.data,
+                authorId: req.user!.userId,
+            },
+        });
+
+        res.status(201).json({ job });
+    } catch (err) {
+        console.error('Admin POST job error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// DELETE /api/admin/jobs/:id
+router.delete('/jobs/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.jobOpening.delete({
+            where: { id },
+        });
+        res.json({ message: 'Job opening deleted' });
+    } catch (err) {
+        console.error('Admin DELETE job error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
