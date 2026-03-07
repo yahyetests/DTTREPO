@@ -421,16 +421,14 @@ router.put('/availability', async (req, res) => {
         // Replace all in a transaction
         await prisma.$transaction([
             prisma.tutorAvailability.deleteMany({ where: { tutorProfileId: tutorProfile.id } }),
-            ...parsed.data.map((slot: { dayOfWeek: number; startTime: string; endTime: string }) =>
-                prisma.tutorAvailability.create({
-                    data: {
-                        tutorProfileId: tutorProfile.id,
-                        dayOfWeek: slot.dayOfWeek,
-                        startTime: slot.startTime,
-                        endTime: slot.endTime,
-                    },
-                })
-            ),
+            prisma.tutorAvailability.createMany({
+                data: parsed.data.map((slot: { dayOfWeek: number; startTime: string; endTime: string }) => ({
+                    tutorProfileId: tutorProfile.id,
+                    dayOfWeek: slot.dayOfWeek,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                })),
+            }),
         ]);
 
         res.json({ message: 'Availability updated' });
