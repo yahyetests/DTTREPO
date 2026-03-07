@@ -4,7 +4,7 @@ import { availableTutors } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { takweenStory, differentiators } from "@/content/site-content";
 
-export default function GenericMarketingPage({ params }: { params: { slug: string } }) {
+export default async function GenericMarketingPage({ params }: { params: { slug: string } }) {
  const knownSlugs = [
  "gcse-maths", "gcse-biology", "gcse-chemistry", "gcse-physics",
  "a-level-philosophy", "gcse-english-literature", "gcse-english-language",
@@ -197,6 +197,19 @@ export default function GenericMarketingPage({ params }: { params: { slug: strin
 
  // 4. Careers Page
  if (params.slug === 'careers') {
+ let jobs = [];
+ try {
+   // Use internal network to fetch jobs
+   const apiUrl = process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+   const res = await fetch(`${apiUrl}/jobs`, { cache: 'no-store' });
+   if (res.ok) {
+     const data = await res.json();
+     jobs = data.jobs || [];
+   }
+ } catch (error) {
+   console.error("Failed to fetch jobs:", error);
+ }
+
  return (
  <div className="min-h-screen bg-white ">
  <div className="bg-primary text-white py-12 sm:py-16 lg:py-24 text-center">
@@ -205,28 +218,32 @@ export default function GenericMarketingPage({ params }: { params: { slug: strin
  </div>
  <div className="container-custom py-10 sm:py-16 lg:py-20">
  <h2 className="text-2xl font-bold text-slate-900 mb-8">Open Positions</h2>
+ {jobs.length === 0 ? (
+   <div className="text-center py-12 text-slate-500">
+     <p>There are no open positions at this time. Please check back later.</p>
+   </div>
+ ) : (
  <div className="grid gap-6">
- {[
- { title: "Senior Mathematics Tutor", type: "Part-time / Remote", dept: "Education" },
- { title: "A-Level Science Specialist", type: "Full-time / Remote", dept: "Education" },
- { title: "Student Success Manager", type: "Full-time / London", dept: "Operations" },
- { title: "Full Stack Developer", type: "Full-time / Remote", dept: "Engineering" },
- ].map((job, i) => (
- <div key={i} className="flex flex-col md:flex-row md:items-center justify-between p-6 rounded-xl border border-slate-200 hover:border-secondary transition-colors group cursor-pointer bg-white ">
+ {jobs.map((job: any) => (
+ <div key={job.id} className="flex flex-col md:flex-row md:items-center justify-between p-6 rounded-xl border border-slate-200 hover:border-secondary transition-colors group cursor-pointer bg-white ">
  <div>
  <h3 className="font-bold text-lg text-slate-900 group-hover:text-secondary transition-colors">{job.title}</h3>
  <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
- <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {job.dept}</span>
+ <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {job.department}</span>
  <span>•</span>
  <span>{job.type}</span>
  </div>
+ {job.description && (
+   <p className="mt-4 text-sm text-slate-600 line-clamp-2">{job.description}</p>
+ )}
  </div>
- <div className="mt-4 md:mt-0">
+ <div className="mt-4 md:mt-0 md:ml-6 shrink-0">
  <Button variant="outline">Apply Now</Button>
  </div>
  </div>
  ))}
  </div>
+ )}
  </div>
  </div>
  );

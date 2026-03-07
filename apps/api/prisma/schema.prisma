@@ -45,6 +45,7 @@ model User {
   tutorProfile     TutorProfile?
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+  jobOpenings      JobOpening[] @relation("JobOpenings")
   refreshToken     String?
 
   // Parent ↔ Student links (many-to-many)
@@ -194,4 +195,19 @@ model TutorAvailability {
   endTime        String       // "17:00"
 
   @@index([tutorProfileId])
+}
+
+model JobOpening {
+  id          String   @id @default(uuid())
+  title       String
+  type        String   // e.g. "Full-time / Remote"
+  department  String   // e.g. "Engineering"
+  description String?
+  isActive    Boolean  @default(true)
+  authorId    String
+  author      User     @relation("JobOpenings", fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([authorId])
 }

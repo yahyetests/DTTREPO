@@ -14,6 +14,7 @@ import {
     AlertTriangle,
     Menu,
     X,
+    Briefcase,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -133,6 +134,13 @@ export default function DashboardLayout({
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const getLinks = () => {
+        if (user?.role === 'ADMIN') {
+            return [
+                { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+                { name: "Job Openings", href: "/admin/jobs", icon: Briefcase },
+                { name: "Settings", href: "/dashboard/settings", icon: Settings },
+            ];
+        }
         if (user?.role === 'TUTOR') {
             return [
                 { name: "Dashboard", href: "/tutor/dashboard", icon: LayoutDashboard },
