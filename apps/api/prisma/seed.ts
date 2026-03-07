@@ -14,6 +14,7 @@ async function main() {
     console.log('🌱 Seeding database...');
     console.warn('⚠️  WARNING: These accounts use weak passwords and are for DEVELOPMENT ONLY.');
     // Clean existing data
+    await prisma.jobOpening.deleteMany();
     await prisma.progress.deleteMany();
     await prisma.message.deleteMany();
     await prisma.session.deleteMany();
