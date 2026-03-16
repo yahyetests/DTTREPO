@@ -11,7 +11,6 @@ import checkoutRoutes from './routes/checkout.js';
 import zoomRoutes from './routes/zoom.js';
 import stripeWebhookRoutes from './routes/stripe-webhook.js';
 import jobsRoutes from './routes/jobs.js';
-import aiRoutes from './routes/ai.js';
 
 const app = express();
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
@@ -55,7 +54,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/zoom', zoomRoutes);
 app.use('/api/jobs', jobsRoutes);
-app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
