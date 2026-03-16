@@ -16,6 +16,7 @@ interface DashboardSession {
  endTime: string; // ISO
  status: string;
  meetingLink?: string;
+ zoomJoinUrl?: string;
 }
 
 interface DashboardProgress {
@@ -210,7 +211,7 @@ export default function StudentDashboardPage() {
  allSessions.slice(0, 5).map((session) => {
  const { month, day } = getDayMonth(session.startTime);
  const handleJoin = () => {
- const zoomUrl = (session as any).zoomJoinUrl;
+ const zoomUrl = session.zoomJoinUrl;
  if (zoomUrl) {
  window.open(zoomUrl, '_blank', 'noopener,noreferrer');
  } else {
