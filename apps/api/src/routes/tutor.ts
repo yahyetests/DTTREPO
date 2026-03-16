@@ -68,12 +68,10 @@ router.get('/dashboard', async (req, res) => {
         });
 
         // Students count
-        const uniqueStudents = new Set(
-            (await prisma.session.findMany({
-                where: { tutorId: tutorProfile.id },
-                select: { studentId: true },
-            })).map((s) => s.studentId)
-        );
+        const totalStudents = await prisma.session.count({
+            where: { tutorId: tutorProfile.id },
+            distinct: ['studentId'],
+        });
 
         res.json({
             profile: {
@@ -105,7 +103,7 @@ router.get('/dashboard', async (req, res) => {
                 upcomingSessions: sessions.length,
                 completedSessions: completedSessions.length,
                 totalEarnings,
-                totalStudents: uniqueStudents.size,
+                totalStudents,
             },
         });
     } catch (err) {
