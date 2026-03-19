@@ -17,6 +17,7 @@ import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import express from 'express';
 import prisma from '../lib/prisma.js';
+import { sendPaymentFailedEmail } from '../lib/email.js';
 
 const router = Router();
 
@@ -180,7 +181,28 @@ router.post(
                         console.error('[Stripe] Failed to update payment_failed booking status:', dbErr);
                     }
 
-                    // TODO: Send notification email to user about failed payment
+                    // Send notification email to user about failed payment
+                    try {
+                        const user = await prisma.user.findFirst({
+                            where: { bookings: { some: { stripeCustomerId: customerId } } },
+                            select: { name: true, email: true },
+                        });
+
+                        if (user) {
+                            await sendPaymentFailedEmail({
+                                userName: user.name,
+                                userEmail: user.email,
+                                amount: invoice.amount_due,
+                                currency: invoice.currency,
+                                invoiceUrl: invoice.hosted_invoice_url,
+                                attemptCount: invoice.attempt_count,
+                            });
+                        } else {
+                            console.warn(`[Stripe] Could not find user for customerId ${customerId} to send failed payment email`);
+                        }
+                    } catch (emailErr) {
+                        console.error('[Stripe] Failed to send payment_failed notification email:', emailErr);
+                    }
 
                     break;
                 }
