@@ -2,7 +2,7 @@ require 'stripe'
 require 'sinatra'
 
 # This is your test secret API key.
-Stripe.api_key = 'sk_test_51SbDhTH8JpK5JEfw4ipqfE2H2VZ3n14NPe7PXeXjK7sryVXKxaI0JOKqW0QyqG92VNu2CIAkF41kJptu8jAQPpUa00zChVo7Gy'
+Stripe.api_key = ENV['STRIPE_SECRET_KEY']
 Stripe.api_version = '2026-01-28.clover'
 
 set :static, true
