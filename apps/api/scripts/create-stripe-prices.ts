@@ -4,7 +4,13 @@
  */
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_51SbDhTH8JpK5JEfw4ipqfE2H2VZ3n14NPe7PXeXjK7sryVXKxaI0JOKqW0QyqG92VNu2CIAkF41kJptu8jAQPpUa00zChVo7Gy');
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeSecretKey) {
+    console.error('Error: STRIPE_SECRET_KEY environment variable is not set.');
+    process.exit(1);
+}
+
+const stripe = new Stripe(stripeSecretKey);
 
 const tiers = [
     { name: 'Platinum Path', envKey: 'STRIPE_PRICE_PLATINUM_PATH', pencePerHour: 4500, ratio: '1:1' },
