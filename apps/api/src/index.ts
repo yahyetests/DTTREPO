@@ -25,8 +25,9 @@ app.use(cors({
     credentials: true,
 }));
 
-// Stripe webhook needs raw body BEFORE json parsing
+// Stripe and Zoom webhooks need raw body BEFORE json parsing
 app.use('/api/checkout', stripeWebhookRoutes);
+app.use('/api/zoom', zoomRoutes);
 
 // Body parsing with size limits to prevent payload abuse
 app.use(express.json({ limit: '1mb' }));
@@ -53,7 +54,6 @@ app.use('/api/tutor', tutorRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/checkout', checkoutRoutes);
-app.use('/api/zoom', zoomRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/ai', aiRoutes);
 
