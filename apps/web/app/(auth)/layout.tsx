@@ -8,7 +8,7 @@ export default function AuthLayout({
  children?: React.ReactNode;
 }) {
  return (
- <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex flex-col items-center justify-center p-4">
+ <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex flex-col items-center py-8 px-4">
  <div className="w-full max-w-md space-y-8">
  <div className="flex items-center justify-between">
  <a href="/" className="flex items-center text-sm text-slate-500 hover:text-primary transition-colors font-semibold">

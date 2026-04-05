@@ -14,7 +14,8 @@ import {
     AlertTriangle,
     Menu,
     X,
-    Briefcase,
+    ClipboardList,
+    Inbox,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -87,7 +88,18 @@ function SidebarContent({
                 </a>
             </div>
 
-            <div className="flex-1 py-6 flex flex-col gap-1 px-4">
+            <div className="p-4 pb-2">
+                <a
+                    href="/subjects"
+                    onClick={onLinkClick}
+                    className="flex items-center justify-center w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl shadow-sm transition-all"
+                >
+                    Return to Subjects
+                </a>
+            </div>
+
+            <div className="flex-1 py-2 flex flex-col gap-1 px-4 overflow-y-auto">
+                <div className="mb-2 px-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Dashboard</div>
                 {sidebarLinks.map((link) => (
                     <a
                         key={link.name}
@@ -99,15 +111,34 @@ function SidebarContent({
                         {link.name}
                     </a>
                 ))}
+
+                <div className="mt-4 mb-2 border-t border-white/10 pt-4 px-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Main Menu</div>
+
+                {[
+                    { name: "Resources", href: "/resources" },
+                    { name: "About the LMS", href: "/about-the-lms" },
+                    { name: "Careers", href: "/careers" },
+                    { name: "Become a Tutor", href: "/become-a-tutor" },
+                    { name: "FAQ", href: "/faq" },
+                ].map((link) => (
+                    <a
+                        key={link.name}
+                        href={link.href}
+                        onClick={onLinkClick}
+                        className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:bg-white/10 hover:text-white transition-all"
+                    >
+                        {link.name}
+                    </a>
+                ))}
             </div>
 
             <div className="p-4 border-t border-white/10">
                 <div className="flex items-center gap-3 px-3 py-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary shrink-0">
+                    <div className={`w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary shrink-0 ${!initials ? 'animate-pulse' : ''}`}>
                         <span className="font-bold text-xs">{initials}</span>
                     </div>
                     <div className="flex-1 overflow-hidden">
-                        <p className="text-sm font-semibold text-white truncate">{user?.name || 'User'}</p>
+                        <p className="text-sm font-semibold text-white truncate">{user?.name || (initials ? 'User' : '')}</p>
                         <p className="text-xs text-slate-400 truncate">{user?.email || ''}</p>
                     </div>
                 </div>
@@ -129,26 +160,31 @@ export default function DashboardLayout({
 }: {
     children?: React.ReactNode;
 }) {
-    const { user, logout } = useAuth();
+    const { user, logout, loading: authLoading } = useAuth();
     const [showSignOut, setShowSignOut] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const getLinks = () => {
         if (user?.role === 'ADMIN') {
             return [
-                { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-                { name: "Job Openings", href: "/admin/jobs", icon: Briefcase },
-                { name: "Settings", href: "/dashboard/settings", icon: Settings },
+                { name: "Overview", href: "/admin", icon: LayoutDashboard },
+                { name: "Tutors", href: "/admin/tutors", icon: Users },
+                { name: "Calendar", href: "/admin/calendar", icon: Calendar },
+                { name: "Students", href: "/admin/students", icon: UserIcon },
+                { name: "Payments", href: "/admin/payments", icon: CreditCard },
+                { name: "Applications", href: "/admin/applications", icon: ClipboardList },
+                { name: "Support Inbox", href: "/admin/support", icon: Inbox },
+                { name: "Settings", href: "/admin/settings", icon: Settings },
             ];
         }
         if (user?.role === 'TUTOR') {
             return [
-                { name: "Dashboard", href: "/tutor/dashboard", icon: LayoutDashboard },
-                { name: "My Sessions", href: "/tutor/sessions", icon: Calendar },
-                { name: "Availability", href: "/tutor/availability", icon: Clock },
-                { name: "Students", href: "/tutor/students", icon: Users },
-                { name: "Messages", href: "/tutor/messages", icon: MessageSquare },
-                { name: "Settings", href: "/tutor/settings", icon: Settings },
+                { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+                { name: "My Sessions", href: "/dashboard/sessions", icon: Calendar },
+                { name: "Availability", href: "/dashboard/availability", icon: Clock },
+                { name: "Students", href: "/dashboard/students", icon: Users },
+                { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
+                { name: "Settings", href: "/dashboard/settings", icon: Settings },
             ];
         }
         if (user?.role === 'PARENT') {
@@ -158,17 +194,17 @@ export default function DashboardLayout({
             ];
         }
         return [
-            { name: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
-            { name: "My Sessions", href: "/student/sessions", icon: Calendar },
-            { name: "Messages", href: "/student/messages", icon: MessageSquare },
-            { name: "Billing", href: "/student/billing", icon: CreditCard },
-            { name: "Resources", href: "/student/resources", icon: Library },
-            { name: "Settings", href: "/student/settings", icon: Settings },
+            { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+            { name: "My Sessions", href: "/dashboard/sessions", icon: Calendar },
+            { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
+            { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
+            { name: "Resources", href: "/dashboard/resources", icon: Library },
+            { name: "Settings", href: "/dashboard/settings", icon: Settings },
         ];
     };
 
     const sidebarLinks = getLinks();
-    const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2) : '?';
+    const initials = authLoading ? '' : (user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2) : '?');
 
     return (
         <div className="min-h-screen bg-white flex">

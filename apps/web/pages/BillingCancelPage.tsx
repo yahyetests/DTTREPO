@@ -24,7 +24,7 @@ export default function BillingCancelPage() {
  Browse Subjects 📖
  </a>
  <a
- href="/student/dashboard"
+ href="/dashboard"
  className="block w-full py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-2xl transition-colors"
  >
  Return to Dashboard

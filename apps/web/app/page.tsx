@@ -36,84 +36,96 @@ export default function Home() {
     return (
         <div className="flex flex-col min-h-screen">
             {/* ── Hero Section ── */}
-            <section className="relative pt-16 pb-12 sm:pt-20 sm:pb-16 lg:pt-36 lg:pb-32 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
-                {/* Subtle background shapes */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
-                    <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-secondary/5 blur-3xl"></div>
-                    <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] rounded-full bg-accent/5 blur-3xl"></div>
+            <main className="hero-bg min-h-screen pt-32 pb-16 px-4 flex flex-col items-center justify-center relative">
+                {/* Status Badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-50 border border-green-100 rounded-full text-xs font-bold text-green-700 uppercase tracking-wider mb-8 animate-bounce">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    Accepting New Students for 2026
                 </div>
 
-                <div className="container-custom relative z-10">
-                    <div className="max-w-4xl mx-auto text-center space-y-8 fade-in-up">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 border border-slate-200 shadow-soft backdrop-blur-sm">
-                            <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-                            <span className="text-xs font-bold text-slate-600 tracking-wide uppercase">
-                                Accepting New Students for 2026
-                            </span>
+                {/* Content Wrapper */}
+                <div className="max-w-5xl mx-auto text-center relative z-10">
+                    {/* Hero Text */}
+                    <h1 className="main-heading text-4xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 mb-6 text-balance">
+                        Learn Smarter and <br className="hidden md:block" />
+                        Achieve Faster with <br />
+                        <span className="text-secondary">Takween</span>
+                    </h1>
+                    <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed text-balance">
+                        With our cutting-edge LMS it’s no wonder we are trusted by thousands of students to achieve their academic goals.
+                    </p>
+
+                    {/* CTA Buttons */}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                        <a href={hero.cta.href} className="w-full sm:w-auto px-8 py-4 bg-secondary hover:bg-green-500 text-white rounded-full text-lg font-bold flex items-center justify-center gap-2 transition-transform hover:scale-105 shadow-xl shadow-secondary/30">
+                            Get Started
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><line x1="5" x2="19" y1="12" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </a>
+                        <a href={hero.ctaSecondary.href} className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-slate-200 hover:border-secondary hover:text-secondary text-slate-700 rounded-full text-lg font-bold transition-all flex items-center justify-center">
+                            Choose Plan
+                        </a>
+                    </div>
+
+                    {/* Social Proof Badges */}
+                    <div className="flex flex-wrap items-center justify-center gap-6 md:gap-12" data-purpose="social-proof">
+                        {/* Badge 1 */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-500">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            </div>
+                            <span className="font-semibold text-slate-700">Trusted by 500+ Parents</span>
                         </div>
-
-                        <h1 className="text-3xl sm:text-4xl lg:text-7xl font-bold tracking-tight text-primary leading-[1.1]">
-                            {hero.headline.split("Takween")[0]}
-                            <span className="text-secondary">
-                                Takween
-                            </span>
-                        </h1>
-
-                        <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                            {hero.subheadline}
-                        </p>
-
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                            <a
-                                href={hero.cta.href}
-                                className="btn-secondary h-12 px-8 text-lg hover:scale-105 transition-transform"
-                            >
-                                {hero.cta.label} <ArrowRight className="w-5 h-5" />
-                            </a>
-                            <a
-                                href={hero.ctaSecondary.href}
-                                className="h-12 px-8 rounded-full font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 transition-all flex items-center justify-center shadow-soft"
-                            >
-                                {hero.ctaSecondary.label}
-                            </a>
+                        {/* Badge 2 */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path></svg>
+                            </div>
+                            <span className="font-semibold text-slate-700">5-Star Rated Tutors</span>
                         </div>
-
-                        <div className="pt-8 sm:pt-12 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-slate-400 text-sm">
-                            <div className="flex items-center gap-2 font-semibold">
-                                <ShieldCheck className="w-5 h-5 text-accent" /> Trusted by 500+ Parents
+                        {/* Badge 3 */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                             </div>
-                            <div className="hidden sm:flex items-center gap-2 font-semibold">
-                                <Star className="w-5 h-5 text-secondary" /> 5-Star Rated Tutors
-                            </div>
-                            <div className="hidden sm:flex items-center gap-2 font-semibold">
-                                <CheckCircle2 className="w-5 h-5 text-green-500" /> DBS Verified
-                            </div>
+                            <span className="font-semibold text-slate-700">DBS Verified</span>
                         </div>
                     </div>
                 </div>
-            </section>
 
-            {/* ── Stats / Trust ── */}
-            <section className="py-6 sm:py-10 bg-white border-y border-slate-200">
-                <div className="container-custom grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
-                    {[
-                        { label: "Active Tutors", value: "500+", emoji: "👩‍🏫" },
-                        { label: "Sessions Taught", value: "10k+", emoji: "📚" },
-                        { label: "Exam Pass Rate", value: "98%", emoji: "🎯" },
-                        { label: "Student Satisfaction", value: "4.9/5", emoji: "⭐" },
-                    ].map((stat, i) => (
-                        <div key={i} className="text-center group">
-                            <div className="text-2xl mb-2">{stat.emoji}</div>
-                            <p className="text-3xl font-bold text-primary mb-1">
-                                {stat.value}
-                            </p>
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                {stat.label}
-                            </p>
-                        </div>
-                    ))}
+                {/* Floating Background Shapes */}
+                <div className="absolute top-1/4 left-10 w-12 h-12 border-4 border-secondary/20 rounded-lg rotate-12 hidden lg:block"></div>
+                <div className="absolute top-1/2 right-10 w-8 h-8 bg-blue-400/10 rounded-full hidden lg:block"></div>
+                <div className="absolute bottom-20 left-1/4 w-16 h-16 border-4 border-yellow-400/20 rounded-full hidden lg:block"></div>
+
+                {/* Classroom Doodles */}
+                <div className="absolute top-20 left-[15%] text-blue-400 opacity-20 rotate-12 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-6xl">menu_book</span>
                 </div>
-            </section>
+                <div className="absolute top-40 right-[10%] text-yellow-400 opacity-20 -rotate-12 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-5xl">lightbulb</span>
+                </div>
+                <div className="absolute bottom-[20%] left-[5%] text-pink-400 opacity-20 rotate-45 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-4xl">edit</span>
+                </div>
+                <div className="absolute top-[60%] right-[5%] text-purple-400 opacity-20 -rotate-45 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-7xl">send</span>
+                </div>
+                <div className="absolute top-[15%] left-[45%] text-green-400 opacity-20 rotate-12 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-4xl">functions</span>
+                </div>
+                <div className="absolute bottom-[30%] right-[20%] text-orange-400 opacity-20 12 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-6xl">school</span>
+                </div>
+                <div className="absolute bottom-[10%] left-[40%] text-cyan-400 opacity-20 -rotate-12 select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-5xl">calculate</span>
+                </div>
+                <div className="absolute top-[40%] left-[8%] text-indigo-400 opacity-20 rotate-[30deg] select-none pointer-events-none">
+                    <span className="material-symbols-outlined text-4xl">auto_stories</span>
+                </div>
+            </main>
 
             {/* ── What Makes Us Different ── */}
             <section className="py-12 sm:py-16 lg:py-24 bg-white">
@@ -147,7 +159,7 @@ export default function Home() {
                         ].map((item, i) => (
                             <div
                                 key={i}
-                                className="card-default p-8"
+                                className={`card-default p-8 hover-lift fade-in-up delay-${(i % 3) * 100}`}
                             >
                                 <div
                                     className={`w-12 h-12 rounded-xl ${item.color} text-white flex items-center justify-center mb-5 shadow-soft`}
@@ -189,7 +201,7 @@ export default function Home() {
                             return (
                                 <div
                                     key={step.step}
-                                    className="card-default p-8 group"
+                                    className="card-default p-8 hover-lift group"
                                 >
                                     <div className="flex items-center gap-4 mb-5">
                                         <div
@@ -232,9 +244,9 @@ export default function Home() {
                         </p>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 fade-in-up delay-100">
-                        {subjects.map((subject) => (
-                            <a key={subject.slug} href={subject.slug} className="group block">
-                                <div className="card-default p-4 sm:p-6 lg:p-8 h-full flex flex-col items-center text-center">
+                        {subjects.map((subject, idx) => (
+                            <a key={subject.slug} href={subject.slug} className={`group block fade-in-up delay-${(idx % 4) * 100}`}>
+                                <div className="card-default p-4 sm:p-6 lg:p-8 h-full flex flex-col items-center text-center hover-lift">
                                     <div className="text-4xl mb-4 transform group-hover:scale-110 transition-transform bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center">
                                         {subject.icon}
                                     </div>
@@ -272,13 +284,14 @@ export default function Home() {
                     </div>
 
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 fade-in-up delay-200">
-                        {pricingTiers['GCSE'].map((tier) => (
+                        {pricingTiers['GCSE'].map((tier, idx) => (
                             <div
                                 key={tier.name}
                                 className={cn(
-                                    "relative p-8 rounded-2xl border transition-all duration-300 flex flex-col",
+                                    "relative p-8 rounded-2xl border transition-all duration-300 flex flex-col hover-lift fade-in-up",
+                                    `delay-${(idx % 3) * 100}`,
                                     tier.highlight
-                                        ? "bg-white border-secondary/40 shadow-glow scale-[1.02] z-10"
+                                        ? "bg-white border-secondary/40 shadow-glow z-10"
                                         : "bg-white border-slate-200 shadow-card hover:shadow-card-hover"
                                 )}
                             >
@@ -372,16 +385,16 @@ export default function Home() {
                         Join the Takween Tutors family today. Your first consultation is on
                         us.
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center fade-in-up delay-200">
                         <a
                             href="/subjects"
-                            className="inline-block bg-secondary text-white font-bold py-4 px-10 rounded-full shadow-glow hover:-translate-y-1 transition-all"
+                            className="inline-flex items-center justify-center gap-2 bg-secondary text-white font-bold py-4 px-10 rounded-full shadow-glow hover-lift"
                         >
-                            Book First Session 🚀
+                            Book First Session <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </a>
                         <a
                             href="/contact"
-                            className="inline-block bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold py-4 px-10 rounded-full hover:bg-white/20 transition-all"
+                            className="inline-block bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold py-4 px-10 rounded-full hover:bg-white/20 hover-lift transition-all"
                         >
                             Talk to an Advisor
                         </a>

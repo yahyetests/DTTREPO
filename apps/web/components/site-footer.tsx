@@ -1,6 +1,12 @@
 
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from "lucide-react";
 
+const TikTokIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5v3a8 8 0 0 1-5-1.5z"></path>
+    </svg>
+);
+
 export function SiteFooter() {
     return (
         <footer className="bg-primary text-white pt-10 sm:pt-12 pb-6 border-t border-slate-800">
@@ -11,11 +17,12 @@ export function SiteFooter() {
                     <p className="text-sm text-slate-300 leading-relaxed">
                         A different kind of tuition agency, built on precision, care, and results.
                     </p>
-                    <div className="flex gap-4 pt-2">
+                    <div className="flex flex-wrap gap-4 pt-2">
                         <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary transition-colors"><Facebook className="w-5 h-5" /></a>
                         <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary transition-colors"><Twitter className="w-5 h-5" /></a>
                         <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary transition-colors"><Instagram className="w-5 h-5" /></a>
                         <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-accent transition-colors"><Linkedin className="w-5 h-5" /></a>
+                        <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary transition-colors"><TikTokIcon className="w-5 h-5" /></a>
                     </div>
                 </div>
 

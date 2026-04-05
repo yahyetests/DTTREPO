@@ -102,7 +102,7 @@ export default function BillingSuccessPage() {
  </p>
 
  <a
- href="/student/dashboard"
+ href="/dashboard"
  className="block w-full py-3.5 text-white font-bold rounded-2xl text-center transition-all shadow-card hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"
  style={{ background: 'linear-gradient(135deg, #0F172A, #334155)' }}
  >
@@ -112,7 +112,7 @@ export default function BillingSuccessPage() {
  ) : (
  <div className="text-center">
  <p className="text-slate-400 mb-6">Redirecting you to your dashboard...</p>
- <a href="/student/dashboard" className="text-primary font-bold hover:underline">Click here if not redirected</a>
+ <a href="/dashboard" className="text-primary font-bold hover:underline">Click here if not redirected</a>
  </div>
  )}
  </div>

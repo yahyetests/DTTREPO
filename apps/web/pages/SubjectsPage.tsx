@@ -17,9 +17,9 @@ export default function SubjectsPage() {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [level, setLevel] = useState<string>("All");
 
-    // 300ms debounce for search
+    // 150ms debounce for snappier search
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(search), 300);
+        const timer = setTimeout(() => setDebouncedSearch(search), 150);
         return () => clearTimeout(timer);
     }, [search]);
 
@@ -40,7 +40,7 @@ export default function SubjectsPage() {
     return (
         <>
             {/* Hero */}
-            <section className="relative bg-gradient-to-b from-slate-50 to-white pt-14 sm:pt-20 pb-8 sm:pb-12 overflow-hidden">
+            <section className="relative bg-gradient-to-b from-slate-50 to-white pt-32 sm:pt-40 pb-8 sm:pb-12 overflow-hidden">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-secondary/10 text-secondary text-sm font-bold mb-6">
                         <BookOpen className="w-4 h-4" />

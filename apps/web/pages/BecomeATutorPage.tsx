@@ -34,7 +34,7 @@ export default function BecomeATutorPage() {
     return (
         <>
             {/* Hero */}
-            <section className="relative bg-gradient-to-b from-slate-50 to-white pt-14 sm:pt-20 pb-10 sm:pb-16 overflow-hidden">
+            <section className="relative bg-gradient-to-b from-slate-50 to-white pt-32 sm:pt-40 pb-10 sm:pb-16 overflow-hidden">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center relative z-10">
                     <span className="inline-block px-4 py-1.5 rounded-full bg-accent/15 text-accent-dark text-sm font-bold mb-6">
                         🎓 Now accepting applications

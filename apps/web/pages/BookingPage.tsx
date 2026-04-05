@@ -398,6 +398,11 @@ export default function BookingPage({ slug }: BookingPageProps) {
                         </section>
 
                         <div className="pt-6 border-t border-slate-100 mt-8">
+                            {(!selectedDate || !selectedTime) && (
+                                <p className="text-sm text-slate-400 mb-3">
+                                    {!selectedDate ? 'Select a date above to continue' : 'Select a time slot above to continue'}
+                                </p>
+                            )}
                             <button
                                 onClick={handleScheduleSubmit}
                                 disabled={!selectedDate || !selectedTime}
@@ -530,7 +535,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Monthly Rate</span>
-                                        <span className="font-bold text-primary ">£{finalWeekly} / month</span>
+                                        <span className="font-bold text-primary ">£{finalMonthly} / month</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Per Session</span>
@@ -540,9 +545,9 @@ export default function BookingPage({ slug }: BookingPageProps) {
 
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
                                     <div>
-                                        <p className="text-sm text-slate-400 mb-1">Monthly total (4 sessions)</p>
-                                        <p className="text-3xl font-bold text-primary ">£{finalWeekly}</p>
-                                        <p className="text-xs text-slate-400 mt-1">~ £{finalMonthly}/mo est.</p>
+                                        <p className="text-sm text-slate-400 mb-1">Monthly total ({freqCount * 4} sessions)</p>
+                                        <p className="text-3xl font-bold text-primary ">£{finalMonthly}</p>
+                                        <p className="text-xs text-slate-400 mt-1">£{finalPerSession}/session × {freqCount * 4} sessions/mo</p>
                                     </div>
                                     <div className="text-right">
                                         <span className="text-xs text-slate-400">🔒 Secured by Stripe</span>
