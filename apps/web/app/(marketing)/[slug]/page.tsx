@@ -1,9 +1,56 @@
+import { useState, useEffect } from "react";
 import { ArrowLeft, Star, ArrowRight, BookOpen, MapPin, Mail, Phone, Users, HelpCircle, Briefcase, Eye, Target, Compass } from "lucide-react";
 import { availableTutors } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { takweenStory, differentiators } from "@/content/site-content";
 
-export default async function GenericMarketingPage({ params }: { params: { slug: string } }) {
+function CareersSection() {
+    const [jobs, setJobs] = useState<any[]>([]);
+
+    useEffect(() => {
+        fetch('/api/jobs')
+            .then(res => res.ok ? res.json() : { jobs: [] })
+            .then(data => setJobs(data.jobs || []))
+            .catch(() => setJobs([]));
+    }, []);
+
+    return (
+        <div className="min-h-screen bg-white ">
+            <div className="bg-primary text-white py-12 sm:py-16 lg:py-24 text-center">
+                <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-4 sm:mb-6">Join Our Mission</h1>
+                <p className="text-xl text-slate-300 max-w-2xl mx-auto">We're looking for passionate educators and innovators to help us shape the future of learning.</p>
+            </div>
+            <div className="container-custom py-10 sm:py-16 lg:py-20">
+                <h2 className="text-2xl font-bold text-slate-900 mb-8">Open Positions</h2>
+                {jobs.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                        <p>There are no open positions at this time. Please check back later.</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-6">
+                        {jobs.map((job: any) => (
+                            <div key={job.id} className="flex flex-col md:flex-row md:items-center justify-between p-6 rounded-xl border border-slate-200 hover:border-secondary transition-colors group cursor-pointer bg-white ">
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-900 group-hover:text-secondary transition-colors">{job.title}</h3>
+                                    <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
+                                        <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {job.department}</span>
+                                        <span>•</span>
+                                        <span>{job.type}</span>
+                                    </div>
+                                    {job.description && (
+                                        <p className="mt-4 text-sm text-slate-600 line-clamp-2">{job.description}</p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default function GenericMarketingPage({ params }: { params: { slug: string } }) {
   const knownSlugs = [
     "gcse-maths", "gcse-biology", "gcse-chemistry", "gcse-physics",
     "a-level-philosophy", "gcse-english-literature", "gcse-english-language",
@@ -196,53 +243,7 @@ export default async function GenericMarketingPage({ params }: { params: { slug:
 
     // 4. Careers Page
     if (params.slug === 'careers') {
-        let jobs = [];
-        try {
-            // Use internal network to fetch jobs
-            const apiUrl = process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            const res = await fetch(`${apiUrl}/jobs`, { cache: 'no-store' });
-            if (res.ok) {
-                const data = await res.json();
-                jobs = data.jobs || [];
-            }
-        } catch (error) {
-            console.error("Failed to fetch jobs:", error);
-        }
-
-        return (
-            <div className="min-h-screen bg-white ">
-                <div className="bg-primary text-white py-12 sm:py-16 lg:py-24 text-center">
-                    <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-4 sm:mb-6">Join Our Mission</h1>
-                    <p className="text-xl text-slate-300 max-w-2xl mx-auto">We're looking for passionate educators and innovators to help us shape the future of learning.</p>
-                </div>
-                <div className="container-custom py-10 sm:py-16 lg:py-20">
-                    <h2 className="text-2xl font-bold text-slate-900 mb-8">Open Positions</h2>
-                    {jobs.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
-                            <p>There are no open positions at this time. Please check back later.</p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-6">
-                            {jobs.map((job: any) => (
-                                <div key={job.id} className="flex flex-col md:flex-row md:items-center justify-between p-6 rounded-xl border border-slate-200 hover:border-secondary transition-colors group cursor-pointer bg-white ">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-slate-900 group-hover:text-secondary transition-colors">{job.title}</h3>
-                                        <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
-                                            <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {job.department}</span>
-                                            <span>•</span>
-                                            <span>{job.type}</span>
-                                        </div>
-                                        {job.description && (
-                                            <p className="mt-4 text-sm text-slate-600 line-clamp-2">{job.description}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
+        return <CareersSection />;
     }
 
     // --- DYNAMIC CONTENT (SUBJECTS / TUTORS) ---
