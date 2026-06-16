@@ -12,6 +12,7 @@ interface TutorSession {
     endTime: string;
     status: string;
     meetingLink?: string;
+    zoomJoinUrl?: string;
 }
 
 interface TutorDashboardData {
@@ -190,7 +191,7 @@ export default function TutorDashboardPage() {
                             sessions.map((session) => {
                                 const { month, day } = getDayMonth(session.startTime);
                                 const handleJoin = () => {
-                                    const zoomUrl = (session as any).zoomJoinUrl;
+                                    const zoomUrl = session.zoomJoinUrl;
                                     if (zoomUrl) {
                                         window.open(zoomUrl, '_blank', 'noopener,noreferrer');
                                     } else {
