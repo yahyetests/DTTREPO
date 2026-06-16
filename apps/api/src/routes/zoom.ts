@@ -14,7 +14,7 @@
  *   GOOGLE_DRIVE_FOLDER_ID      – target folder ID in Google Drive
  */
 
-import { Router, Request, Response } from 'express';
+import express, { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 
 const router = Router();
@@ -24,7 +24,8 @@ function isValidZoomWebhook(req: Request): boolean {
     const secretToken = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
     if (!secretToken) return false;
 
-    const message = `v0:${req.headers['x-zm-request-timestamp']}:${JSON.stringify(req.body)}`;
+    // Use raw body for signature validation to ensure bit-perfect comparison
+    const message = `v0:${req.headers['x-zm-request-timestamp']}:${req.body.toString('utf-8')}`;
     const hashForVerify = crypto
         .createHmac('sha256', secretToken)
         .update(message)
@@ -35,12 +36,18 @@ function isValidZoomWebhook(req: Request): boolean {
 }
 
 // POST /api/zoom/webhook
-router.post('/webhook', async (req: Request, res: Response) => {
-    try {
-        // ── Zoom URL validation challenge ──
-        if (req.body.event === 'endpoint.url_validation') {
-            const plainToken = req.body.payload?.plainToken;
-            const secretToken = process.env.ZOOM_WEBHOOK_SECRET_TOKEN || '';
+router.post(
+    '/webhook',
+    express.raw({ type: 'application/json' }),
+    async (req: Request, res: Response) => {
+        try {
+            // Parse raw body into JSON
+            const body = JSON.parse(req.body.toString('utf-8'));
+
+            // ── Zoom URL validation challenge ──
+            if (body.event === 'endpoint.url_validation') {
+                const plainToken = body.payload?.plainToken;
+                const secretToken = process.env.ZOOM_WEBHOOK_SECRET_TOKEN || '';
             const hashForValidation = crypto
                 .createHmac('sha256', secretToken)
                 .update(plainToken)
@@ -61,12 +68,12 @@ router.post('/webhook', async (req: Request, res: Response) => {
         }
 
         // ── Only handle recording.completed ──
-        if (req.body.event !== 'recording.completed') {
+        if (body.event !== 'recording.completed') {
             res.status(200).json({ message: 'Event ignored' });
             return;
         }
 
-        const payload = req.body.payload?.object;
+        const payload = body.payload?.object;
         if (!payload) {
             res.status(400).json({ error: 'Missing payload' });
             return;
