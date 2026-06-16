@@ -1,5 +1,5 @@
 import React from 'react';
-import { GraduationCap, Users, TrendingUp, Clock, Send, CheckCircle2, ArrowRight } from 'lucide-react';
+import { GraduationCap, Users, TrendingUp } from 'lucide-react';
 import TallyEmbed from '@/components/TallyEmbed';
 import { TestimonialsCarousel } from '@/components/TestimonialsCarousel';
 
